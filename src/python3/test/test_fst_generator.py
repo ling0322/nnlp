@@ -5,15 +5,13 @@ from nnlp.bnf_tokenizer import BNFTokenizer
 from nnlp.rule_parser import RuleParser
 from nnlp.fst_generator import FSTGenerator
 from nnlp.util import SourcePosition, generate_rule_set
-from nnlp.fst import TextFstWriter
+from nnlp.fst import TextFSTWriter
+
+from .util import trim_text
+
 
 class TestFSTGenerator(unittest.TestCase):
     r''' unit test class for BNT tokenizer '''
-
-    def _trim_text(self, text: str) -> str:
-        r''' removing leading space in text'''
-
-        return '\n'.join(map(lambda t: t.strip(), text.split('\n')))
 
     def test_fst_generator(self):
         r''' test the tokenizer for a simple rule '''
@@ -29,15 +27,15 @@ class TestFSTGenerator(unittest.TestCase):
         f_isym = io.StringIO()
         f_osym = io.StringIO()
 
-        fst_writer = TextFstWriter(f_fst, f_isym, f_osym)
+        fst_writer = TextFSTWriter(f_fst, f_isym, f_osym)
         fst_generator(rule_set, 'root', fst_writer)
 
         self.assertEqual(
             f_fst.getvalue(),
-            self._trim_text("""0 2 0 0 0.0
-            2 3 1 1 0.0
-            3 4 2 2 0.0
-            4 2 0 0 0.0
-            2 1 0 0 0.0
-            1 0.0
-            """))
+            trim_text("""0 2 0 0 0.0
+                2 3 1 1 0.0
+                3 4 2 2 0.0
+                4 2 0 0 0.0
+                2 1 0 0 0.0
+                1 0.0
+                """))
