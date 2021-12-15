@@ -11,7 +11,30 @@ EPS_SYM = ''  # epsilon symbol
 
 NAN = float('nan')
 
-class FstWriter(abc.ABC):
+
+class Disambig:
+    ''' represent disambiguation symbol #1, #2, #3, ... in Fst
+    Args:
+        symbol_id: id of disambiguation symbol, 1 for #1, 2 for #2, ... '''
+
+    _cache: dict[int, Disambig] = {}
+    symbol_id: int
+
+    def __new__(cls, symbol_id: int) -> Disambig:
+        if symbol_id in cls._cache:
+            return cls._cache[symbol_id]
+        
+        disambig = super(Disambig, cls).__new__(cls)
+        disambig.symbol_id = symbol_id
+        cls._cache[symbol_id] = disambig
+
+        return disambig
+
+    def __repr__(self) -> str:
+        return f'#_disambig_{self.symbol_id}'
+
+
+class FSTWriter(abc.ABC):
     r''' base class for Fst writer that supports add arc, add state and set final state '''
 
     @abc.abstractmethod
@@ -19,7 +42,7 @@ class FstWriter(abc.ABC):
         self,
         src_state: int,
         dest_state: int,
-        isymbol: str,
+        isymbol: Disambig | str,
         osymbol: str,
         weight: float = 0.0,
     ) -> None:
@@ -49,23 +72,30 @@ class FstWriter(abc.ABC):
         pass
 
 
-class TextFstWriter(FstWriter):
+class TextFSTWriter(FSTWriter):
     r''' fst writer for OpenFST text file format
     FST arc was using OpenFST/AT&T FSM format: src dest ilabel olabel [weight]
     Args:
         fst_stream (TextIO): stream for writing AT&T FSM format FST
         ilabel_stream (TextIO): stream for writing input symbols 
-        olabel_stream (TextIO): stream for writing output symbols '''
+        olabel_stream (TextIO): stream for writing output symbols 
+        disambig_start_idx (int): start index for disambiguation symbols '''
 
-    def __init__(self, fst_stream: TextIO, ilabel_stream: TextIO, olabel_stream: TextIO) -> None:
+    def __init__(self,
+                 fst_stream: TextIO,
+                 ilabel_stream: TextIO,
+                 olabel_stream: TextIO,
+                 disambig_start_idx: int = 2000000) -> None:
         self._isymbols: dict[str, int] = {EPS_SYM: EPS_ID}
         self._osymbols: dict[str, int] = {EPS_SYM: EPS_ID}
+        self._disambig_symbol_ids: set[int] = set()
         self._n_states = 1
         self._fst_stream: TextIO = fst_stream
         self._ilabel_stream: TextIO = ilabel_stream
         self._olabel_stream: TextIO = olabel_stream
 
         self._symbol_table_written = False
+        self._disambig_start_idx = disambig_start_idx
 
     def create_state(self) -> int:
         r''' implements ABC FstWriter '''
@@ -82,7 +112,7 @@ class TextFstWriter(FstWriter):
     def add_arc(self,
                 src_state: int,
                 dest_state: int,
-                isymbol: str,
+                isymbol: Disambig | str,
                 osymbol: str,
                 weight: float = 0.0) -> None:
         r''' implements ABC FstWriter '''
@@ -102,6 +132,11 @@ class TextFstWriter(FstWriter):
         self._write_symbol_table(self._isymbols, self._ilabel_stream)
         self._write_symbol_table(self._osymbols, self._olabel_stream)
 
+        # process disambig symbols
+        if self._disambig_symbol_ids:
+            disambig_symbols = self._generate_disambig_symbol_table()
+            self._write_symbol_table(disambig_symbols, self._ilabel_stream)
+
         self._symbol_table_written = True
 
     def _write_symbol_table(self, symbol_table: dict[str, int], stream: TextIO) -> None:
@@ -115,12 +150,39 @@ class TextFstWriter(FstWriter):
                 symbol = '<eps>'
             stream.write(f'{symbol} {symbol_id}\n')
 
-    def _get_symbol_id(self, symbol: str, symbol_dict: dict[str, int]) -> int:
+    def _generate_disambig_symbol_table(self) -> dict[str, int]:
+        ''' generate symbol table for disambiguation symbols '''
+
+        disambig_symbol_ids = list(self._disambig_symbol_ids)
+        disambig_symbol_ids.sort()
+        disambig_symbols: dict[str, int] = {}
+        
+        for symbol_id in disambig_symbol_ids:
+            original_symbol = f'#_disambig_{symbol_id}'
+            symbol = original_symbol
+            symbol_suffix = 0
+
+            # find an symbol string if the disambig symbol conflicts with self._isymbols
+            while symbol in self._isymbols:
+                symbol = original_symbol + f'_{symbol_suffix}'
+                symbol_suffix += 1
+            disambig_symbols[symbol] = self._disambig_start_idx + symbol_id
+        
+        return disambig_symbols
+
+    def _get_symbol_id(self, symbol: Disambig | str, symbol_dict: dict[str, int]) -> int:
         r''' get id of a input symbol from symbol_dict, it will create a new symbol id if 
         symbol not exist in symbol_dict '''
 
+        if isinstance(symbol, Disambig):
+            self._disambig_symbol_ids.add(symbol.symbol_id)
+            return self._disambig_start_idx + symbol.symbol_id
+
         if symbol not in symbol_dict:
             symbol_id = len(symbol_dict)
+            if symbol_id == self._disambig_start_idx:
+                raise Exception(f'too many input symbols (consider increase disambig_start_idx?)')
+
             symbol_dict[symbol] = symbol_id
             return symbol_id
         else:
@@ -225,7 +287,7 @@ class Fst:
                 raise Exception(f'invalid line in fst stream: {line.strip()}')
 
         return fst
-    
+
     def get_arcs(self, state: int, ilabel: str) -> list[FstArc]:
         r''' get arcs by specific input label of state '''
         if state not in self._graph:
@@ -265,5 +327,3 @@ class Fst:
             symbols[symbol_id] = symbol
 
         return symbols
-
-

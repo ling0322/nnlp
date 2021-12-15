@@ -8,13 +8,13 @@ from .rule import Rule
 from .bnf_tokenizer import BNFTokenizer
 from .rule_parser import RuleParser
 from .util import BNFSyntaxError, SourcePosition, generate_rule_set
-from .fst import EPS_SYM, FstWriter, TextFstWriter
+from .fst import EPS_SYM, FSTWriter, TextFSTWriter
 
 
 class FSTGenerator:
     r''' generate FST from rule set '''
 
-    def __call__(self, rule_set: dict[str, set[Rule]], root: str, fst_writer: FstWriter) -> None:
+    def __call__(self, rule_set: dict[str, set[Rule]], root: str, fst_writer: FSTWriter) -> None:
         r''' generate FST from a rule set, and write the FST to file using fst_writer
              Args:
                  rule_set (Dict[str, Set[Rule]]): the rule set
@@ -22,7 +22,7 @@ class FSTGenerator:
                  fst_writer (FstWriter): the fst writer'''
 
         self._rule_set: dict[str, set[Rule]] = rule_set
-        self._fst_writer: FstWriter = fst_writer
+        self._fst_writer: FSTWriter = fst_writer
 
         # build the FST
         begin_state = 0

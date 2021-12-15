@@ -11,7 +11,7 @@ from .fst_generator import FSTGenerator
 from .rule_parser import RuleParser
 from .util import SourcePosition, generate_rule_set
 
-from .fst import Fst, EPS_SYM, TextFstWriter
+from .fst import Fst, EPS_SYM, TextFSTWriter
 
 
 class _Token:
