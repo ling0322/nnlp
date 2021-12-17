@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Sequence, TYPE_CHECKING, Type, Union
 
-from .symbol import EPS_SYM
+from .symbol import EPS_SYM, Symbol
 from .fst import Disambig, FSTWriter
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class LexiconFSTGenerator:
                 # back to state 0 if ch is the last char in word
                 arc_weight = weight if idx == 0 else 0
                 next_state = 0 if idx == len(word) - 1 else fst_writer.create_state()
-                osymbol = word if idx == 0 else EPS_SYM
+                osymbol: Symbol = word if idx == 0 else EPS_SYM
 
                 fst_writer.add_arc(state, next_state, symbol, osymbol, arc_weight)
                 state = next_state
