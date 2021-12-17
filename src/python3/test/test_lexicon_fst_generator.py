@@ -27,13 +27,13 @@ class TestLexiconFSTGenerator(unittest.TestCase):
 
         self.assertEqual(
             f_fst.getvalue(),
-            trim_text("""0 1 1 1 -0.69
-                1 0 2 0 0
-                0 2 1 2 -0.36
-                2 3 3 0 0
-                3 4 4 0 0
-                4 5 4 0 0
-                5 0 5 0 0
+            trim_text("""0 1 2 2 -0.69
+                1 0 3 0 0
+                0 2 2 3 -0.36
+                2 3 4 0 0
+                3 4 5 0 0
+                4 5 5 0 0
+                5 0 6 0 0
                 0 0.0
                 """))
 

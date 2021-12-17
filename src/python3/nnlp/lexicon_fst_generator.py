@@ -2,27 +2,34 @@
 from __future__ import annotations
 from typing import Sequence, TYPE_CHECKING, Type, Union
 
-from .fst import EPS_SYM, Disambig, FSTWriter
+from .symbol import EPS_SYM
+from .fst import Disambig, FSTWriter
 
 if TYPE_CHECKING:
     Lexicon = list[tuple[str, Sequence[str], float]]
     DisambigLexicon = list[tuple[str, Sequence[Union[str, Disambig]], float]]
 
+
+
 class LexiconFSTGenerator:
     r''' generate FST from lexicon '''
 
-    def __call__(self, lexicon: Lexicon, fst_writer: FSTWriter) -> None:
+    def __call__(self,
+                 lexicon: Lexicon,
+                 fst_writer: FSTWriter,
+                 unknown_symbol: str = 'output') -> None:
         ''' 
         generate FST from lexicon, and write the FST to file using fst_writer
         Args:
             lexicon: lexicon with (word, symbols, weight) pair
-            fst_writer (FstWriter): the fst writer'''
+            fst_writer (FstWriter): the fst writer
+            unknown_symbol (str): behavior for unknown symbol. 
+                                  output: output the symbol itself
+                                  ignore: ignore this symbol
+                                  fail: do not add logic to handle unknown symbols, and decoding
+                                        will fail when an unknown symbol occured '''
 
         disambig_lexicon = self._add_disambig(lexicon)
-        with open('lexicon2.txt', 'w', encoding='utf-8') as f:
-            for word, symbols, weight in disambig_lexicon:
-                symbols = map(str, symbols)
-                f.write(f'{word}\t{weight}\t{" ".join(symbols)}\n')
 
         for word, symbols, weight in disambig_lexicon:
             state = 0
@@ -34,6 +41,7 @@ class LexiconFSTGenerator:
 
                 fst_writer.add_arc(state, next_state, symbol, osymbol, arc_weight)
                 state = next_state
+
 
         fst_writer.set_final_state(0)
         fst_writer.write()
@@ -54,14 +62,14 @@ class LexiconFSTGenerator:
         vocab: set[tuple[str, ...]] = set()
         ambig: set[tuple[str, ...]] = set()
         for _, symbols, _ in lexicon:
-            symbols = tuple(symbols) 
+            symbols = tuple(symbols)
             for idx in range(len(symbols) - 1):
-                prefix.add(tuple(symbols[: idx]))
-            
+                prefix.add(tuple(symbols[:idx]))
+
             if symbols in vocab:
                 ambig.add(symbols)
             vocab.add(symbols)
-        
+
         # free vocab
         vocab = set()
 
@@ -71,14 +79,13 @@ class LexiconFSTGenerator:
             disambig_symbols: tuple[Union[str, Disambig], ...] = tuple(symbols)
             if symbols in disambig:
                 disambig[symbols] += 1
-                disambig_symbols += (Disambig(disambig[symbols]), )
+                disambig_symbols += (Disambig(disambig[symbols]),)
             elif symbols in prefix or symbols in ambig:
                 disambig[symbols] = 1
-                disambig_symbols += (Disambig(disambig[symbols]), )
+                disambig_symbols += (Disambig(disambig[symbols]),)
             else:
                 disambig[symbols] = 0
-            
-            disambig_lexicon.append((word, disambig_symbols, weight))
-        
-        return disambig_lexicon
 
+            disambig_lexicon.append((word, disambig_symbols, weight))
+
+        return disambig_lexicon

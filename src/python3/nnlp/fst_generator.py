@@ -8,8 +8,8 @@ from .rule import Rule
 from .bnf_tokenizer import BNFTokenizer
 from .rule_parser import RuleParser
 from .util import BNFSyntaxError, SourcePosition, generate_rule_set
-from .fst import EPS_SYM, FSTWriter, TextFSTWriter
-
+from .fst import FSTWriter, TextFSTWriter
+from .symbol import EPS_SYM
 
 class FSTGenerator:
     r''' generate FST from rule set '''

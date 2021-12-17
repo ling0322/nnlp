@@ -11,13 +11,13 @@ from .fst_generator import FSTGenerator
 from .rule_parser import RuleParser
 from .util import SourcePosition, generate_rule_set
 
-from .fst import Fst, EPS_SYM, TextFSTWriter
-
+from .fst import Fst, TextFSTWriter
+from .symbol import EPS_SYM, Symbol
 
 class _Token:
     r''' token in decoding lattice '''
 
-    def __init__(self, state: int, olabel: str, prev_tok: Union[_Token, None], cost: float) -> None:
+    def __init__(self, state: int, olabel: Symbol, prev_tok: Union[_Token, None], cost: float) -> None:
         self.state = state
         self.olabel = olabel
         self.prev_token = prev_tok
@@ -121,7 +121,7 @@ class FstDecoder:
         symbols: list[str] = []
         best_tok: Optional[_Token] = min(self._beam)
         while best_tok:
-            if best_tok.olabel != EPS_SYM:
+            if isinstance(best_tok.olabel, str):
                 symbols.append(best_tok.olabel)
             best_tok = best_tok.prev_token
         symbols.reverse()
