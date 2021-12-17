@@ -1,37 +1,12 @@
 from __future__ import annotations
 
 import abc
-from typing import List, TextIO, Union
+from typing import List, TextIO
 from operator import itemgetter
-import unittest
-import io
 
-EPS_ID = 0  # symbol id for epsilon
-EPS_SYM = ''  # epsilon symbol
+from .symbol import EPS_SYM, EPS_SYM_ID, MAX_SYMBOLS, NUM_RESERVED_SYM, UNK_SYM, UNK_SYM_ID, Disambig, Epsilon, Symbol, Unknown
 
 NAN = float('nan')
-
-
-class Disambig:
-    ''' represent disambiguation symbol #1, #2, #3, ... in Fst
-    Args:
-        symbol_id: id of disambiguation symbol, 1 for #1, 2 for #2, ... '''
-
-    _cache: dict[int, Disambig] = {}
-    symbol_id: int
-
-    def __new__(cls, symbol_id: int) -> Disambig:
-        if symbol_id in cls._cache:
-            return cls._cache[symbol_id]
-        
-        disambig = super(Disambig, cls).__new__(cls)
-        disambig.symbol_id = symbol_id
-        cls._cache[symbol_id] = disambig
-
-        return disambig
-
-    def __repr__(self) -> str:
-        return f'#_disambig_{self.symbol_id}'
 
 
 class FSTWriter(abc.ABC):
@@ -42,8 +17,8 @@ class FSTWriter(abc.ABC):
         self,
         src_state: int,
         dest_state: int,
-        isymbol: Disambig | str,
-        osymbol: str,
+        isymbol: Symbol,
+        osymbol: Symbol,
         weight: float = 0.0,
     ) -> None:
         r''' 
@@ -51,8 +26,8 @@ class FSTWriter(abc.ABC):
             Args:
             src_state (int): source state
             dest_state (int): destination state
-            isymbol (str): input symbol
-            osymbol (str): output symbol
+            isymbol (Symbol): input symbol
+            osymbol (Symbol): output symbol
             weight (float): weight'''
         pass
 
@@ -84,10 +59,9 @@ class TextFSTWriter(FSTWriter):
     def __init__(self,
                  fst_stream: TextIO,
                  ilabel_stream: TextIO,
-                 olabel_stream: TextIO,
-                 disambig_start_idx: int = 2000000) -> None:
-        self._isymbols: dict[str, int] = {EPS_SYM: EPS_ID}
-        self._osymbols: dict[str, int] = {EPS_SYM: EPS_ID}
+                 olabel_stream: TextIO) -> None:
+        self._isymbols: dict[str, int] = {}
+        self._osymbols: dict[str, int] = {}
         self._disambig_symbol_ids: set[int] = set()
         self._n_states = 1
         self._fst_stream: TextIO = fst_stream
@@ -95,7 +69,7 @@ class TextFSTWriter(FSTWriter):
         self._olabel_stream: TextIO = olabel_stream
 
         self._symbol_table_written = False
-        self._disambig_start_idx = disambig_start_idx
+        self._disambig_start_idx = MAX_SYMBOLS
 
     def create_state(self) -> int:
         r''' implements ABC FstWriter '''
@@ -112,8 +86,8 @@ class TextFSTWriter(FSTWriter):
     def add_arc(self,
                 src_state: int,
                 dest_state: int,
-                isymbol: Disambig | str,
-                osymbol: str,
+                isymbol: Symbol,
+                osymbol: Symbol,
                 weight: float = 0.0) -> None:
         r''' implements ABC FstWriter '''
 
@@ -129,57 +103,80 @@ class TextFSTWriter(FSTWriter):
         if self._symbol_table_written:
             raise Exception(f'FST data already written')
 
+        self._write_eps_symbol(self._ilabel_stream)
+        self._write_unk_symbol(self._ilabel_stream)
         self._write_symbol_table(self._isymbols, self._ilabel_stream)
-        self._write_symbol_table(self._osymbols, self._olabel_stream)
-
-        # process disambig symbols
         if self._disambig_symbol_ids:
-            disambig_symbols = self._generate_disambig_symbol_table()
-            self._write_symbol_table(disambig_symbols, self._ilabel_stream)
+            self._write_disambig_symbols(self._ilabel_stream)
+
+        self._write_eps_symbol(self._olabel_stream)
+        self._write_unk_symbol(self._olabel_stream)
+        self._write_symbol_table(self._osymbols, self._olabel_stream)
 
         self._symbol_table_written = True
 
+    def _write_unk_symbol(self, stream: TextIO) -> None:
+        ''' write unknown symbol to stream '''
+
+        stream.write(f'{self._generate_name("unk")} {UNK_SYM_ID}\n')
+
+    def _write_eps_symbol(self, stream: TextIO) -> None:
+        ''' write epsilon symbol to stream '''
+
+        stream.write(f'{self._generate_name("eps")} {EPS_SYM_ID}\n')
+
     def _write_symbol_table(self, symbol_table: dict[str, int], stream: TextIO) -> None:
-        r''' write symbol table to a stream '''
+        ''' write symbol table to a stream '''
 
         symbols = list(symbol_table.items())
         symbols.sort(key=itemgetter(1))
 
         for symbol, symbol_id in symbols:
-            if symbol == '':
-                symbol = '<eps>'
             stream.write(f'{symbol} {symbol_id}\n')
 
-    def _generate_disambig_symbol_table(self) -> dict[str, int]:
-        ''' generate symbol table for disambiguation symbols '''
+    def _write_disambig_symbols(self, stream: TextIO) -> None:
+        ''' write disambiguation symbols to stream '''
 
         disambig_symbol_ids = list(self._disambig_symbol_ids)
         disambig_symbol_ids.sort()
-        disambig_symbols: dict[str, int] = {}
-        
+
         for symbol_id in disambig_symbol_ids:
-            original_symbol = f'#_disambig_{symbol_id}'
-            symbol = original_symbol
-            symbol_suffix = 0
+            name = f'{symbol_id}'
+            symbol = self._generate_name(name)
+    
+            stream.write(f'{symbol} {self._disambig_start_idx + symbol_id}\n')
 
-            # find an symbol string if the disambig symbol conflicts with self._isymbols
-            while symbol in self._isymbols:
-                symbol = original_symbol + f'_{symbol_suffix}'
-                symbol_suffix += 1
-            disambig_symbols[symbol] = self._disambig_start_idx + symbol_id
-        
-        return disambig_symbols
 
-    def _get_symbol_id(self, symbol: Disambig | str, symbol_dict: dict[str, int]) -> int:
+    def _generate_name(self, name: str) -> str:
+        ''' generate a symbol name that not conflict with current input and output symbol table '''
+
+        prefix = ''
+        final_name = f'#{prefix}{name}'
+        while final_name in self._osymbols or final_name in self._isymbols:
+            prefix += '_'
+            final_name = f'#{prefix}{name}'
+
+        return final_name
+
+
+
+    def _get_symbol_id(self, symbol: Symbol, symbol_dict: dict[str, int]) -> int:
         r''' get id of a input symbol from symbol_dict, it will create a new symbol id if 
         symbol not exist in symbol_dict '''
 
         if isinstance(symbol, Disambig):
             self._disambig_symbol_ids.add(symbol.symbol_id)
             return self._disambig_start_idx + symbol.symbol_id
+        elif isinstance(symbol, Epsilon):
+            return EPS_SYM_ID
+        elif isinstance(symbol, Unknown):
+            return UNK_SYM_ID
+
+        if symbol == '':
+            raise Exception(f'empty symbol is not supported, use EPS_SYM instead?')
 
         if symbol not in symbol_dict:
-            symbol_id = len(symbol_dict)
+            symbol_id = len(symbol_dict) + NUM_RESERVED_SYM
             if symbol_id == self._disambig_start_idx:
                 raise Exception(f'too many input symbols (consider increase disambig_start_idx?)')
 
@@ -199,7 +196,7 @@ class FstArc:
         osymbol (str): output symbol
         weight (float): weight'''
 
-    def __init__(self, src_state: int, dest_state: int, isymbol: str, osymbol: str,
+    def __init__(self, src_state: int, dest_state: int, isymbol: Symbol, osymbol: Symbol,
                  weight: float) -> None:
         self.src_state = src_state
         self.dest_state = dest_state
@@ -227,6 +224,12 @@ class Fst:
         # load FST from text file
         fst = Fst.from_text(isymbol_file, osymbol_file, fst_file) '''
 
+
+    _eps_isymbol: str
+    _unk_isymbol: str
+    _eps_osymbol: str
+    _unk_osymbol: str
+
     def __init__(self) -> None:
         r''' create a empty FST '''
 
@@ -237,6 +240,10 @@ class Fst:
 
         # final_states[state] -> final weight
         self._final_states: dict[int, float] = {}
+
+        # input symbols
+        self._isymbols: set[str] = set()
+
 
     @classmethod
     def from_text(cls, ilabel_input: TextIO, olabel_input: TextIO, fst_input: TextIO) -> Fst:
@@ -254,6 +261,11 @@ class Fst:
         isymbols = fst._read_symbols(ilabel_input)
         osymbols = fst._read_symbols(olabel_input)
 
+        fst._eps_isymbol = isymbols[EPS_SYM_ID]
+        fst._unk_isymbol = isymbols[UNK_SYM_ID]
+        fst._eps_osymbol = osymbols[EPS_SYM_ID]
+        fst._unk_osymbol = osymbols[UNK_SYM_ID]
+
         for line in fst_input:
             # src dest ilabel olabel [weight]  <- arc
             # state [weight]                   <- final state
@@ -261,13 +273,25 @@ class Fst:
             if len(row) in {4, 5}:
                 src_state = int(row[0])
                 dest_state = int(row[1])
-                ilabel = isymbols[int(row[2])]
-                olabel = osymbols[int(row[3])]
+                ilabel: str = isymbols[int(row[2])]
+                olabel: str = osymbols[int(row[3])]
                 weight: float = 0
                 if len(row) == 5:
                     weight = float(row[4])
 
-                arc = FstArc(src_state, dest_state, ilabel, olabel, weight)
+                isymbol: Symbol = ilabel
+                if ilabel == fst._eps_isymbol:
+                    isymbol = EPS_SYM
+                elif ilabel == fst._unk_isymbol:
+                    isymbol = UNK_SYM
+
+                osymbol: Symbol = olabel
+                if olabel == fst._eps_osymbol:
+                    osymbol = EPS_SYM
+                elif olabel == fst._unk_osymbol:
+                    osymbol = UNK_SYM
+
+                arc = FstArc(src_state, dest_state, isymbol, osymbol, weight)
                 fst._arcs.append(arc)
 
                 # add arc to graph
@@ -288,8 +312,18 @@ class Fst:
 
         return fst
 
-    def get_arcs(self, state: int, ilabel: str) -> list[FstArc]:
+    def get_arcs(self, state: int, isymbol: Symbol) -> list[FstArc]:
         r''' get arcs by specific input label of state '''
+
+        if isinstance(isymbol, str):
+            ilabel = isymbol
+        elif isinstance(isymbol, Unknown):
+            ilabel = self._unk_isymbol
+        elif isinstance(isymbol, Epsilon):
+            ilabel = self._eps_isymbol
+        else:
+            raise Exception(f'unexapcted isymbol: {isymbol}')
+
         if state not in self._graph:
             return []
         if ilabel not in self._graph[state]:
@@ -315,15 +349,27 @@ class Fst:
             row = line.strip().split()
             if len(row) != 2:
                 raise Exception(f'invalid line in symbol_stream: {line.strip()}')
-            symbol = row[0]
+            symbol: str = row[0]
             symbol_id = int(row[1])
 
-            # state 0 is reserved for epsilon
-            if symbol_id == 0:
-                symbol = ''
+            if symbol_id > MAX_SYMBOLS:
+                raise Exception('unexpceted symbol-id (forgot to remove disambig symbols?)')
 
             while len(symbols) <= symbol_id:
+                # '' not now allowed as a symbol, we will check it later
                 symbols.append('')
             symbols[symbol_id] = symbol
+        
+        
+        if len(symbols) < 2 or symbols[1] == '' or symbols[0] == '':
+            raise Exception(f'eps (0) and unk (1) should exist in symbol file')
+
+        if symbols[0][0] != '#' or symbols[1][0] != '#':
+            raise Exception(f'unexpected symbol file: 0 is reserved for epsilon and 1 is reserved for unk')
+
+
+        for idx, symbol in enumerate(symbols):
+            if symbol == '':
+                symbols[idx] = symbols[0]
 
         return symbols
