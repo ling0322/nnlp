@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import abc
-from typing import List, TextIO
+from typing import TYPE_CHECKING, List, Sequence, TextIO, Union
 from operator import itemgetter
+import json
 
+from .util import encode_symbol
 from .symbol import EPS_SYM, EPS_SYM_ID, MAX_SYMBOLS, NUM_RESERVED_SYM, UNK_SYM, UNK_SYM_ID, Disambig, Epsilon, Symbol, Unknown
 
 NAN = float('nan')
 
+if TYPE_CHECKING:
+    FstArcTarget = tuple[int, int, float]
 
 class FSTWriter(abc.ABC):
     r''' base class for Fst writer that supports add arc, add state and set final state '''
@@ -158,8 +162,6 @@ class TextFSTWriter(FSTWriter):
 
         return final_name
 
-
-
     def _get_symbol_id(self, symbol: Symbol, symbol_dict: dict[str, int]) -> int:
         r''' get id of a input symbol from symbol_dict, it will create a new symbol id if 
         symbol not exist in symbol_dict '''
@@ -185,38 +187,6 @@ class TextFSTWriter(FSTWriter):
         else:
             return symbol_dict[symbol]
 
-
-class FstArc:
-    r''' 
-    arc in FST graph
-    Args:
-        src_state (int): source state
-        dest_state (int): destination state
-        isymbol (str): input symbol
-        osymbol (str): output symbol
-        weight (float): weight'''
-
-    def __init__(self, src_state: int, dest_state: int, isymbol: Symbol, osymbol: Symbol,
-                 weight: float) -> None:
-        self.src_state = src_state
-        self.dest_state = dest_state
-        self.isymbol = isymbol
-        self.osymbol = osymbol
-        self.weight = weight
-
-    def __repr__(self) -> str:
-        return f'FstArc({self.src_state}, {self.dest_state}, "{self.isymbol}", "{self.osymbol}", {self.weight})'
-
-    def __eq__(self, right) -> bool:
-        if not isinstance(right, FstArc):
-            return False
-        return right.weight == self.weight and \
-               right.src_state == self.src_state and \
-               right.dest_state == self.dest_state and \
-               right.isymbol == self.isymbol and \
-               right.osymbol == self.osymbol
-
-
 class Fst:
     r''' 
     stores the symbol and graph data of FST. 
@@ -225,25 +195,60 @@ class Fst:
         fst = Fst.from_text(isymbol_file, osymbol_file, fst_file) '''
 
 
-    _eps_isymbol: str
-    _unk_isymbol: str
-    _eps_osymbol: str
-    _unk_osymbol: str
-
     def __init__(self) -> None:
         r''' create a empty FST '''
 
-        self._arcs: list[FstArc] = []
+        # graph[src_state][isymbol_encoded] -> list[tuple[tgt_state, osymbol_id, weight]]
+        # or 
+        self._graph: list[dict[str, list[tuple[int, int, float]]]] = []
 
-        # graph[src_state][isymbol] -> list[FstArc]
-        self._graph: dict[int, dict[str, list[FstArc]]] = {}
+        # weights for final states
+        self._final_weights: dict[int, float] = {}
 
-        # final_states[state] -> final weight
-        self._final_states: dict[int, float] = {}
+        # all input string symbols
+        self._isymbol_dict: dict[str, int] = {}
 
-        # input symbols
-        self._isymbols: set[str] = set()
+        # list of output symbols: osymbol = _osymbols[osymbol_id]
+        self._osymbols: list[Symbol] = []
 
+
+    def to_json(self, f_json: TextIO) -> None:
+        ''' dump the FST to json file '''
+
+        graph = self._graph
+        final_weights = list(self._final_weights.items())
+        isymbol_dict = self._isymbol_dict
+        osymbols = list(map(str, self._osymbols))
+
+        o = dict(
+            version=1,
+            graph=graph,
+            isymbol_dict=isymbol_dict,
+            osymbols=osymbols,
+            final_weights=final_weights
+        )
+        return json.dump(o, f_json, separators=(',', ':'))
+
+    @classmethod
+    def from_json(cls, f_json: Union[TextIO, str]) -> Fst:
+        ''' load FST from json file '''
+
+        fst = Fst()
+        if isinstance(f_json, str):
+            with open(f_json, encoding='utf-8') as f:
+                o = json.load(f)
+        else:
+            o = json.load(f_json)
+
+        fst._graph = o['graph']
+        fst._isymbol_dict = o['isymbol_dict']
+        fst._final_weights = dict(o['final_weights'])
+
+        fst._osymbols = o['osymbols']
+        fst._osymbols[EPS_SYM_ID] = EPS_SYM
+        fst._osymbols[UNK_SYM_ID] = UNK_SYM
+
+        return fst
 
     @classmethod
     def from_text(cls, ilabel_input: TextIO, olabel_input: TextIO, fst_input: TextIO) -> Fst:
@@ -258,13 +263,11 @@ class Fst:
 
         fst = Fst()
 
-        isymbols = fst._read_symbols(ilabel_input)
-        osymbols = fst._read_symbols(olabel_input)
-
-        fst._eps_isymbol = isymbols[EPS_SYM_ID]
-        fst._unk_isymbol = isymbols[UNK_SYM_ID]
-        fst._eps_osymbol = osymbols[EPS_SYM_ID]
-        fst._unk_osymbol = osymbols[UNK_SYM_ID]
+        isymbols: list[Symbol] = fst._read_symbols(ilabel_input)
+        for isym_id, isymbol in enumerate(isymbols):
+            if isinstance(isymbol, str):
+                fst._isymbol_dict[isymbol] = isym_id
+        fst._osymbols = fst._read_symbols(olabel_input)
 
         for line in fst_input:
             # src dest ilabel olabel [weight]  <- arc
@@ -273,78 +276,70 @@ class Fst:
             if len(row) in {4, 5}:
                 src_state = int(row[0])
                 dest_state = int(row[1])
-                ilabel: str = isymbols[int(row[2])]
-                olabel: str = osymbols[int(row[3])]
+                isymbol_id: int = int(row[2])
+                osymbol_id: int = int(row[3])
                 weight: float = 0
                 if len(row) == 5:
                     weight = float(row[4])
 
-                isymbol: Symbol = ilabel
-                if ilabel == fst._eps_isymbol:
-                    isymbol = EPS_SYM
-                elif ilabel == fst._unk_isymbol:
-                    isymbol = UNK_SYM
-
-                osymbol: Symbol = olabel
-                if olabel == fst._eps_osymbol:
-                    osymbol = EPS_SYM
-                elif olabel == fst._unk_osymbol:
-                    osymbol = UNK_SYM
-
-                arc = FstArc(src_state, dest_state, isymbol, osymbol, weight)
-                fst._arcs.append(arc)
+                isymbol = isymbols[isymbol_id]
+                isymbol_encoded = encode_symbol(isymbol)
 
                 # add arc to graph
-                if src_state not in fst._graph:
-                    fst._graph[src_state] = {}
-                if ilabel not in fst._graph[src_state]:
-                    fst._graph[src_state][ilabel] = []
-                fst._graph[src_state][ilabel].append(arc)
+                while len(fst._graph) <= src_state:
+                    fst._graph.append(dict())
+                if isymbol_encoded not in fst._graph[src_state]:
+                    fst._graph[src_state][isymbol_encoded] = []
+                fst._graph[src_state][isymbol_encoded].append((dest_state, osymbol_id, weight))
 
-            elif len(row) == 2:
+            elif len(row) in {1, 2}:
                 # final state
                 state = int(row[0])
-                weight = float(row[1])
-                fst._final_states[state] = weight
+                weight = 0
+                if len(row) == 2:
+                    weight = float(row[1])
+                fst._final_weights[state] = weight
 
             else:
                 raise Exception(f'invalid line in fst stream: {line.strip()}')
 
         return fst
 
-    def get_arcs(self, state: int, isymbol: Symbol) -> list[FstArc]:
-        r''' get arcs by specific input label of state '''
+    @property
+    def isymbol_dict(self) -> dict[str, int]:
+        ''' get the input symbol to input symbol id mapping dict '''
 
-        if isinstance(isymbol, str):
-            ilabel = isymbol
-        elif isinstance(isymbol, Unknown):
-            ilabel = self._unk_isymbol
-        elif isinstance(isymbol, Epsilon):
-            ilabel = self._eps_isymbol
-        else:
-            raise Exception(f'unexapcted isymbol: {isymbol}')
+        return self._isymbol_dict
 
-        if state not in self._graph:
+    def get_arcs(self, state: int, isymbol: Symbol) -> list[tuple[int, int, float]]:
+        r''' get arcs by specific input label of state returns (dest_state, osymbol_id, weight) '''
+
+        isymbol_encoded = encode_symbol(isymbol)
+
+        if isymbol_encoded not in self._graph[state]:
             return []
-        if ilabel not in self._graph[state]:
-            return []
-        return self._graph[state][ilabel]
+        return self._graph[state][isymbol_encoded]
 
     def get_final_weight(self, state: int) -> float:
         r''' get weights for final state, return NAN if it's not a final state '''
-        return self._final_states.get(state, NAN)
+        return self._final_weights.get(state, NAN)
+
+    def get_osymbol(self, osymbol_id) -> Symbol:
+        ''' get output symbol by id '''
+
+        return self._osymbols[osymbol_id]
 
     @staticmethod
-    def _read_symbols(symbol_stream: TextIO) -> List[str]:
+    def _read_symbols(symbol_stream: TextIO) -> list[Symbol]:
         r'''
         read symbol list from symbol_stream. the symbol list format is: <symbol> <symbol-id>\n
-        State 0 is reserved for epsilon, so the symbol will be changed to an empty string.
+        It will also change EPS and UNK symbols to Epsilon() and Unknown()
         Args:
             symbol_stream (TextIO): the text stream for symbol list
         Returns:
-            the symbol list'''
+            the dict[symbol_id: int, symbol: Symbol]'''
 
-        symbols: list[str] = []
+        symbols: dict[int, Symbol] = {}
         for line in symbol_stream:
             row = line.strip().split()
             if len(row) != 2:
@@ -355,21 +350,24 @@ class Fst:
             if symbol_id > MAX_SYMBOLS:
                 raise Exception('unexpceted symbol-id (forgot to remove disambig symbols?)')
 
-            while len(symbols) <= symbol_id:
-                # '' not now allowed as a symbol, we will check it later
-                symbols.append('')
             symbols[symbol_id] = symbol
         
-        
-        if len(symbols) < 2 or symbols[1] == '' or symbols[0] == '':
-            raise Exception(f'eps (0) and unk (1) should exist in symbol file')
+        if EPS_SYM_ID not in symbols or UNK_SYM_ID not in symbols:
+            raise Exception(f'eps ({EPS_SYM_ID}) and unk ({UNK_SYM_ID}) should exist in symbol file')
 
-        if symbols[0][0] != '#' or symbols[1][0] != '#':
+        eps_sym = symbols[EPS_SYM_ID]
+        unk_sym = symbols[UNK_SYM_ID]
+        assert isinstance(eps_sym, str) and isinstance(unk_sym, str)
+        if eps_sym[0] != '#' or unk_sym[0] != '#':
             raise Exception(f'unexpected symbol file: 0 is reserved for epsilon and 1 is reserved for unk')
 
+        symbols[EPS_SYM_ID] = EPS_SYM
+        symbols[UNK_SYM_ID] = UNK_SYM
 
-        for idx, symbol in enumerate(symbols):
-            if symbol == '':
-                symbols[idx] = symbols[0]
+        symbol_list: list[Symbol] = []
+        for symbol_id, sym in symbols.items():
+            while len(symbol_list) <= symbol_id:
+                symbol_list.append(EPS_SYM)
+            symbol_list[symbol_id] = sym
 
-        return symbols
+        return symbol_list
