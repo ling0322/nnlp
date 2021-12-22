@@ -4,64 +4,43 @@ from typing import Any, Optional, Union
 
 class Epsilon:
     ''' represents an epsilon symbol in fst '''
-    _inst: Optional[Epsilon] = None
-
-    def __new__(cls) -> Epsilon:
-        if cls._inst:
-            return cls._inst
-        eps = super(Epsilon, cls).__new__(cls)
-        cls._inst = eps
-
-        return eps
 
     def __str__(self) -> str:
-        return f'<eps>'
+        return f'#eps'
 
-    def __repe__(self) -> str:
-        return f'Epsilon()'
+    def __eq__(self, o: Any) -> bool:
+        return isinstance(o, Epsilon)
 
 class Unknown:
-    ''' represents an unknown symbol in fst '''
+    ''' represents an unknown symbol in fst
+    Args:
+        symbol_id: id of unknown symbol '''
 
-    _inst: Optional[Unknown] = None
-
-    def __new__(cls) -> Unknown:
-        if cls._inst:
-            return cls._inst
-        unk = super(Unknown, cls).__new__(cls)
-        cls._inst = unk
-
-        return unk
+    def __init__(self, symbol_id: int = 0) -> None:
+        self.symbol_id = symbol_id
 
     def __str__(self) -> str:
-        return f'#_unk'
+        if self.symbol_id == 0:
+            return f'#unk'
+        else:
+            return f'#unk_{self.symbol_id}'
 
-    def __repe__(self) -> str:
-        return f'Unknown()'
+    def __eq__(self, o: Any) -> bool:
+        return isinstance(o, Unknown) and self.symbol_id == o.symbol_id
 
 class Disambig:
     ''' represent disambiguation symbol #1, #2, #3, ... in Fst
     Args:
         symbol_id: id of disambiguation symbol, 1 for #1, 2 for #2, ... '''
 
-    _cache: dict[int, Disambig] = {}
-    symbol_id: int
-
-    def __new__(cls, symbol_id: int) -> Disambig:
-        if symbol_id in cls._cache:
-            return cls._cache[symbol_id]
-        
-        disambig = super(Disambig, cls).__new__(cls)
-        disambig.symbol_id = symbol_id
-        cls._cache[symbol_id] = disambig
-
-        return disambig
+    def __init__(self, symbol_id: int) -> None:
+        self.symbol_id = symbol_id
 
     def __str__(self) -> str:
-        return f'#_disambig_{self.symbol_id}'
+        return f'#{self.symbol_id}'
 
-    def __repr__(self) -> str:
-        return f'Disambig({self.symbol_id})'
+    def __eq__(self, o: Any) -> bool:
+        return isinstance(o, Disambig) and self.symbol_id == o.symbol_id
 
 EPS_SYM = Epsilon()
 EPS_SYM_ID = 0

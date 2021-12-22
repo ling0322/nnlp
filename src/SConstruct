@@ -1,0 +1,1 @@
+SConscript(['src/cxx/nnlp_tools/SConstruct'], variant_dir='target/nnlp_tools', duplicate=False)

@@ -1,6 +1,6 @@
 import sys
 
-from .cmd import build_lexicon_fst
+from .cli import build_lexicon_fst, remove_disambig
 
 def print_usage_and_exit() -> None:
     print('Usage: python3 -m nnlp <command> [args]')
@@ -16,3 +16,5 @@ if __name__ == '__main__':
     cmd = sys.argv[1]
     if cmd == 'build_lexicon_fst':
         build_lexicon_fst(sys.argv[2: ])
+    elif cmd == 'rm_disambig':
+        remove_disambig(sys.argv[2: ])

@@ -42,10 +42,73 @@ class TestLexiconFSTGenerator(unittest.TestCase):
 
         fst_generator = LexiconFSTGenerator()
         lexicon = [('fo', ('f', 'o'), -0.69), ('foo', ('f', 'o', 'o'), -0.36),
-                   ('bar', ('f', 'o', 'o'), -0.36), ('foot', ('f', 'o', 'o', 't'), -0.36)]
+                   ('bar', ('f', 'o', 'o'), -0.36)]
 
         self.assertListEqual(fst_generator._add_disambig(lexicon),
                              [('fo', ('f', 'o', Disambig(1)), -0.69),
                               ('foo', ('f', 'o', 'o', Disambig(1)), -0.36),
-                              ('bar', ('f', 'o', 'o', Disambig(2)), -0.36),
-                              ('foot', ('f', 'o', 'o', 't'), -0.36)])
+                              ('bar', ('f', 'o', 'o', Disambig(2)), -0.36),])
+
+        f_fst = io.StringIO()
+        f_isym = io.StringIO()
+        f_osym = io.StringIO()
+
+        fst_writer = TextFSTWriter(f_fst, f_isym, f_osym)
+        fst_generator(lexicon, fst_writer)
+        self.assertEqual(
+            f_fst.getvalue(),
+            trim_text("""0 1 2 2 -0.69
+                1 2 3 0 0
+                2 0 10000001 0 0
+                0 3 2 3 -0.36
+                3 4 3 0 0
+                4 5 3 0 0
+                5 0 10000001 0 0
+                0 6 2 4 -0.36
+                6 7 3 0 0
+                7 8 3 0 0
+                8 0 10000002 0 0
+                0 0.0
+                """))
+
+    def test_unknown_output(self):
+        r''' test the LexiconFSTGenerator '''
+
+        fst_generator = LexiconFSTGenerator()
+        lexicon = [('hi', ('h', 'i'), 0)]
+
+        f_fst = io.StringIO()
+        f_isym = io.StringIO()
+        f_osym = io.StringIO()
+
+        fst_writer = TextFSTWriter(f_fst, f_isym, f_osym)
+        fst_generator(lexicon, fst_writer, unknown_symbol='output')
+
+        self.assertEqual(
+            f_fst.getvalue(),
+            trim_text("""0 1 2 2 0
+                1 0 3 0 0
+                0 0 1 1 2.303
+                0 0.0
+                """))
+
+    def test_unknown_ignore(self):
+        r''' test the LexiconFSTGenerator '''
+
+        fst_generator = LexiconFSTGenerator()
+        lexicon = [('hi', ('h', 'i'), 0)]
+
+        f_fst = io.StringIO()
+        f_isym = io.StringIO()
+        f_osym = io.StringIO()
+
+        fst_writer = TextFSTWriter(f_fst, f_isym, f_osym)
+        fst_generator(lexicon, fst_writer, unknown_symbol='ignore')
+
+        self.assertEqual(
+            f_fst.getvalue(),
+            trim_text("""0 1 2 2 0
+                1 0 3 0 0
+                0 0 1 0 2.303
+                0 0.0
+                """))

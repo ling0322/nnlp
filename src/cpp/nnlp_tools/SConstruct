@@ -1,0 +1,2 @@
+env = Environment(CXXFLAGS="-g -O3 -fPIC")
+env.Program('fstrmepslocal', ['fstrmepslocal.cc'], LIBS=['fst'])
