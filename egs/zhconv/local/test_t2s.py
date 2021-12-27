@@ -1,6 +1,6 @@
 from nnlp import Fst, Converter
 
-fst = Fst.from_json('exp/zh_t2s.json')
+fst = Fst.from_json('exp/zhconv_t2s.json')
 converter = Converter(fst)
 assert converter.convert_string('肯德基要點的是原始的薄皮嫩雞') == '肯德基要点的是原始的薄皮嫩鸡'
 assert converter.convert_string('一堆人吃辣的卡拉雞，那個才不是經典') == '一堆人吃辣的卡拉鸡，那个才不是经典'

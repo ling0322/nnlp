@@ -3,8 +3,9 @@ import unittest
 import math
 import io
 
-from nnlp.lexicon_fst_generator import LexiconFSTGenerator
-from nnlp.fst import Disambig, TextFSTWriter
+from nnlp.fst import Disambig
+from nnlp_tools.lexicon_fst_generator import LexiconFSTGenerator
+from nnlp_tools.fst_writer import TextFSTWriter
 
 from .util import trim_text
 

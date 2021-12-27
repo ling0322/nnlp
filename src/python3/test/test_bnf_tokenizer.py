@@ -1,9 +1,9 @@
 import io
 import unittest
 
-from nnlp.bnf_tokenizer import BNFTokenizer
-from nnlp.util import BNFSyntaxError
-from nnlp.common import BNFToken
+from nnlp_tools.bnf_tokenizer import BNFTokenizer
+from nnlp_tools.util import BNFSyntaxError
+from nnlp_tools.common import BNFToken
 
 class TestBNFTokenizer(unittest.TestCase):
     r''' unit test class for BNT tokenizer '''

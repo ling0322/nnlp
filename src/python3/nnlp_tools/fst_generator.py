@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import unittest
-import io
-
 from .common import BNFToken
 from .rule import Rule
-from .bnf_tokenizer import BNFTokenizer
-from .rule_parser import RuleParser
-from .util import BNFSyntaxError, SourcePosition, generate_rule_set
-from .fst import FSTWriter, TextFSTWriter
-from .symbol import EPS_SYM
+from .util import BNFSyntaxError
+
+from nnlp.symbol import EPS_SYM
+
+from nnlp_tools.fst_writer import FSTWriter
 
 class FSTGenerator:
     r''' generate FST from rule set '''

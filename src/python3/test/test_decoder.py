@@ -2,13 +2,14 @@ import io
 import unittest
 
 from nnlp.decoder import FstDecoder
-from nnlp.bnf_tokenizer import BNFTokenizer
-from nnlp.rule_parser import RuleParser
-from nnlp.fst_generator import FSTGenerator
-from nnlp.util import SourcePosition, generate_rule_set
-from nnlp.fst import TextFSTWriter, Fst
-from nnlp.lexicon_fst_generator import LexiconFSTGenerator
+from nnlp.fst import Fst
 
+from nnlp_tools.bnf_tokenizer import BNFTokenizer
+from nnlp_tools.rule_parser import RuleParser
+from nnlp_tools.fst_generator import FSTGenerator
+from nnlp_tools.util import SourcePosition, generate_rule_set
+from nnlp_tools.lexicon_fst_generator import LexiconFSTGenerator
+from nnlp_tools.fst_writer import TextFSTWriter
 
 class TestFstDecoder(unittest.TestCase):
 

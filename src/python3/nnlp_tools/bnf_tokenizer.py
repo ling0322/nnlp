@@ -1,7 +1,5 @@
-from enum import Enum
 from typing import List, Optional, Tuple
 import re
-import unittest
 
 from .util import BNFSyntaxError
 from .common import BNFToken
