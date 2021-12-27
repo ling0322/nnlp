@@ -1,8 +1,9 @@
 import io
 import unittest
 
-from nnlp.fst import EPS_SYM, Disambig, Fst, TextFSTWriter
+from nnlp.fst import EPS_SYM, Disambig, Fst
 from nnlp.symbol import EPS_SYM_ID
+from nnlp_tools.fst_writer import TextFSTWriter
 
 from .util import trim_text
 

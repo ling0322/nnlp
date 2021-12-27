@@ -4,8 +4,9 @@ from typing import Optional, Sequence, TYPE_CHECKING, Type, Union
 import math
 import sys
 
-from .symbol import EPS_SYM, UNK_SYM, Symbol, Unknown
-from .fst import Disambig, FSTWriter
+from nnlp.symbol import EPS_SYM, UNK_SYM, Symbol
+from nnlp.fst import Disambig
+from nnlp_tools.fst_writer import FSTWriter
 
 if TYPE_CHECKING:
     Lexicon = list[tuple[str, Sequence[str], float]]

@@ -3,35 +3,18 @@
 from __future__ import annotations
 
 import argparse
-import io
 import typing
 import math
 
-from .symbol import EPS_SYM_ID, MAX_SYMBOLS
+from nnlp.symbol import EPS_SYM_ID, MAX_SYMBOLS
+
+from .fst_writer import TextFSTWriter
 from .lexicon_fst_generator import LexiconFSTGenerator
-from .fst import TextFSTWriter
+from .util import read_lexicon
+
 
 if typing.TYPE_CHECKING:
-    from .lexicon_fst_generator import Lexicon, DisambigLexicon
-
-
-def _read_lexicon(filename: str) -> Lexicon:
-    ''' read lexicon from file, the lexicon format is:
-        <word> <probability> <symbol1> <symbol2> ... <symbolN>\\n '''
-    lexicon: Lexicon = []
-    with open(filename, encoding='utf-8') as f:
-        for line in f:
-            try:
-                row = line.strip().split()
-                assert len(row) >= 3
-                word = row[0]
-                weight = -math.log(float(row[1]))
-                symbols = row[2:]
-                lexicon.append((word, symbols, weight))
-            except Exception as _:
-                raise Exception(f'unexpected line in {filename}: {line.strip()}')
-
-    return lexicon
+    from .lexicon_fst_generator import DisambigLexicon
 
 
 def _write_lexicon(lexicon: DisambigLexicon, filename: str) -> None:
@@ -72,7 +55,7 @@ def build_lexicon_fst(args: list[str]) -> None:
     fst_generator = LexiconFSTGenerator()
 
     # read lexicon
-    lexicon = _read_lexicon(cmd_args.input)
+    lexicon = read_lexicon(cmd_args.input)
 
     # open output files
     with open(cmd_args.ilabel, 'w', encoding='utf-8') as f_isym, \
@@ -100,8 +83,8 @@ def _remove_fst_disambig(input_file: str, output_file: str) -> None:
             
             f_out.write(' '.join(row) + '\n')
 
-def _remove_lexicon_disambig(input_file: str, output_file: str) -> None:
-    ''' remove disambig symbols from text format lexicon '''
+def _remove_syms_disambig(input_file: str, output_file: str) -> None:
+    ''' remove disambig symbols from text format symbols file '''
 
     with open(input_file, encoding='utf-8') as f_in, \
          open(output_file, 'w', encoding='utf-8') as f_out:
@@ -120,7 +103,7 @@ def remove_disambig(args: list[str]) -> None:
                                      description='''remove disambig symbols from either text format FST (-input_fst) or
                                                     lexicon (-input_lexicon)''')
     parser.add_argument('-input_fst', help='input text format FST file')
-    parser.add_argument('-input_lexicon', help='input text format lexicon file')
+    parser.add_argument('-input_syms', help='input text format symbols file')
     parser.add_argument('-output', help='output text format FST file')
     cmd_args = parser.parse_args(args)
 
@@ -128,8 +111,8 @@ def remove_disambig(args: list[str]) -> None:
         parser.print_help()
         return
 
-    if cmd_args.input_fst and not cmd_args.input_lexicon:
+    if cmd_args.input_fst and not cmd_args.input_syms:
         _remove_fst_disambig(cmd_args.input_fst, cmd_args.output)
-    elif not cmd_args.input_fst and cmd_args.input_lexicon:
-        _remove_lexicon_disambig(cmd_args.input_lexicon, cmd_args.output)
+    elif not cmd_args.input_fst and cmd_args.input_syms:
+        _remove_syms_disambig(cmd_args.input_syms, cmd_args.output)
     

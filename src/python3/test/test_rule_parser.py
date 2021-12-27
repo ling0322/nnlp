@@ -1,11 +1,11 @@
 import io
 import unittest
 
-from nnlp.bnf_tokenizer import BNFTokenizer
-from nnlp.rule_parser import RuleParser
-from nnlp.util import SourcePosition
-from nnlp.common import BNFToken
-from nnlp.rule import Rule
+from nnlp_tools.bnf_tokenizer import BNFTokenizer
+from nnlp_tools.rule_parser import RuleParser
+from nnlp_tools.util import SourcePosition
+from nnlp_tools.common import BNFToken
+from nnlp_tools.rule import Rule
 
 
 class TestRuleParser(unittest.TestCase):
