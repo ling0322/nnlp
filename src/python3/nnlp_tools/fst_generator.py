@@ -8,6 +8,7 @@ from nnlp.symbol import EPS_SYM
 
 from nnlp_tools.fst_writer import FSTWriter
 
+
 class FSTGenerator:
     r''' generate FST from rule set '''
 
@@ -122,5 +123,3 @@ class FSTGenerator:
             state = start_state
 
         return state
-
-

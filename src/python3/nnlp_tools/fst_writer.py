@@ -4,7 +4,7 @@ import abc
 from typing import TYPE_CHECKING, TextIO
 from operator import itemgetter
 
-from nnlp.symbol import EPS_SYM_ID, MAX_SYMBOLS, NUM_RESERVED_SYM, UNK_SYM_ID, Disambig, Epsilon, Symbol, Unknown
+from nnlp.symbol import EPS_SYM
 
 NAN = float('nan')
 
@@ -19,8 +19,8 @@ class FSTWriter(abc.ABC):
         self,
         src_state: int,
         dest_state: int,
-        isymbol: Symbol,
-        osymbol: Symbol,
+        isymbol: str,
+        osymbol: str,
         weight: float = 0.0,
     ) -> None:
         r''' 
@@ -28,8 +28,8 @@ class FSTWriter(abc.ABC):
             Args:
             src_state (int): source state
             dest_state (int): destination state
-            isymbol (Symbol): input symbol
-            osymbol (Symbol): output symbol
+            isymbol (str): input symbol
+            osymbol (str): output symbol
             weight (float): weight'''
         pass
 
@@ -62,16 +62,15 @@ class TextFSTWriter(FSTWriter):
                  fst_stream: TextIO,
                  ilabel_stream: TextIO,
                  olabel_stream: TextIO) -> None:
-        self._isymbols: dict[str, int] = {}
-        self._osymbols: dict[str, int] = {}
-        self._disambig_symbol_ids: set[int] = set()
+        self._isymbols: dict[str, int] = {EPS_SYM: 0}
+        self._osymbols: dict[str, int] = {EPS_SYM: 0}
+
         self._n_states = 1
         self._fst_stream: TextIO = fst_stream
         self._ilabel_stream: TextIO = ilabel_stream
         self._olabel_stream: TextIO = olabel_stream
 
         self._symbol_table_written = False
-        self._disambig_start_idx = MAX_SYMBOLS
 
     def create_state(self) -> int:
         r''' implements ABC FstWriter '''
@@ -88,8 +87,8 @@ class TextFSTWriter(FSTWriter):
     def add_arc(self,
                 src_state: int,
                 dest_state: int,
-                isymbol: Symbol,
-                osymbol: Symbol,
+                isymbol: str,
+                osymbol: str,
                 weight: float = 0.0) -> None:
         r''' implements ABC FstWriter '''
 
@@ -105,27 +104,10 @@ class TextFSTWriter(FSTWriter):
         if self._symbol_table_written:
             raise Exception(f'FST data already written')
 
-        self._write_eps_symbol(self._ilabel_stream)
-        self._write_unk_symbol(self._ilabel_stream)
         self._write_symbol_table(self._isymbols, self._ilabel_stream)
-        if self._disambig_symbol_ids:
-            self._write_disambig_symbols(self._ilabel_stream)
-
-        self._write_eps_symbol(self._olabel_stream)
-        self._write_unk_symbol(self._olabel_stream)
         self._write_symbol_table(self._osymbols, self._olabel_stream)
 
         self._symbol_table_written = True
-
-    def _write_unk_symbol(self, stream: TextIO) -> None:
-        ''' write unknown symbol to stream '''
-
-        stream.write(f'{self._generate_name("unk")} {UNK_SYM_ID}\n')
-
-    def _write_eps_symbol(self, stream: TextIO) -> None:
-        ''' write epsilon symbol to stream '''
-
-        stream.write(f'{self._generate_name("eps")} {EPS_SYM_ID}\n')
 
     def _write_symbol_table(self, symbol_table: dict[str, int], stream: TextIO) -> None:
         ''' write symbol table to a stream '''
@@ -136,50 +118,15 @@ class TextFSTWriter(FSTWriter):
         for symbol, symbol_id in symbols:
             stream.write(f'{symbol} {symbol_id}\n')
 
-    def _write_disambig_symbols(self, stream: TextIO) -> None:
-        ''' write disambiguation symbols to stream '''
-
-        disambig_symbol_ids = list(self._disambig_symbol_ids)
-        disambig_symbol_ids.sort()
-
-        for symbol_id in disambig_symbol_ids:
-            name = f'{symbol_id}'
-            symbol = self._generate_name(name)
-    
-            stream.write(f'{symbol} {self._disambig_start_idx + symbol_id}\n')
-
-
-    def _generate_name(self, name: str) -> str:
-        ''' generate a symbol name that not conflict with current input and output symbol table '''
-
-        prefix = ''
-        final_name = f'#{prefix}{name}'
-        while final_name in self._osymbols or final_name in self._isymbols:
-            prefix += '_'
-            final_name = f'#{prefix}{name}'
-
-        return final_name
-
-    def _get_symbol_id(self, symbol: Symbol, symbol_dict: dict[str, int]) -> int:
+    def _get_symbol_id(self, symbol: str, symbol_dict: dict[str, int]) -> int:
         r''' get id of a input symbol from symbol_dict, it will create a new symbol id if 
         symbol not exist in symbol_dict '''
-
-        if isinstance(symbol, Disambig):
-            self._disambig_symbol_ids.add(symbol.symbol_id)
-            return self._disambig_start_idx + symbol.symbol_id
-        elif isinstance(symbol, Epsilon):
-            return EPS_SYM_ID
-        elif isinstance(symbol, Unknown):
-            return UNK_SYM_ID
 
         if symbol == '':
             raise Exception(f'empty symbol is not supported, use EPS_SYM instead?')
 
         if symbol not in symbol_dict:
-            symbol_id = len(symbol_dict) + NUM_RESERVED_SYM
-            if symbol_id == self._disambig_start_idx:
-                raise Exception(f'too many input symbols (consider increase disambig_start_idx?)')
-
+            symbol_id = len(symbol_dict)
             symbol_dict[symbol] = symbol_id
             return symbol_id
         else:

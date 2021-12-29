@@ -3,6 +3,7 @@ from typing import List, Optional
 from .util import SourcePosition
 from .common import BNFToken
 
+
 class Rule:
     r''' represents a BNF rule in grammar
     Args:

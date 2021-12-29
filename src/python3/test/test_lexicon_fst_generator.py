@@ -3,7 +3,6 @@ import unittest
 import math
 import io
 
-from nnlp.fst import Disambig
 from nnlp_tools.lexicon_fst_generator import LexiconFSTGenerator
 from nnlp_tools.fst_writer import TextFSTWriter
 
@@ -28,13 +27,13 @@ class TestLexiconFSTGenerator(unittest.TestCase):
 
         self.assertEqual(
             f_fst.getvalue(),
-            trim_text("""0 1 2 2 -0.69
-                1 0 3 0 0
-                0 2 2 3 -0.36
-                2 3 4 0 0
-                3 4 5 0 0
-                4 5 5 0 0
-                5 0 6 0 0
+            trim_text("""0 1 1 1 -0.69
+                1 0 2 0 0
+                0 2 1 2 -0.36
+                2 3 3 0 0
+                3 4 4 0 0
+                4 5 4 0 0
+                5 0 5 0 0
                 0 0.0
                 """))
 
@@ -45,10 +44,11 @@ class TestLexiconFSTGenerator(unittest.TestCase):
         lexicon = [('fo', ('f', 'o'), -0.69), ('foo', ('f', 'o', 'o'), -0.36),
                    ('bar', ('f', 'o', 'o'), -0.36)]
 
-        self.assertListEqual(fst_generator._add_disambig(lexicon),
-                             [('fo', ('f', 'o', Disambig(1)), -0.69),
-                              ('foo', ('f', 'o', 'o', Disambig(1)), -0.36),
-                              ('bar', ('f', 'o', 'o', Disambig(2)), -0.36),])
+        self.assertListEqual(fst_generator._add_disambig(lexicon), [
+            ('fo', ('f', 'o', '#1'), -0.69),
+            ('foo', ('f', 'o', 'o', '#1'), -0.36),
+            ('bar', ('f', 'o', 'o', '#2'), -0.36),
+        ])
 
         f_fst = io.StringIO()
         f_isym = io.StringIO()
@@ -58,17 +58,17 @@ class TestLexiconFSTGenerator(unittest.TestCase):
         fst_generator(lexicon, fst_writer)
         self.assertEqual(
             f_fst.getvalue(),
-            trim_text("""0 1 2 2 -0.69
-                1 2 3 0 0
-                2 0 10000001 0 0
-                0 3 2 3 -0.36
-                3 4 3 0 0
-                4 5 3 0 0
-                5 0 10000001 0 0
-                0 6 2 4 -0.36
-                6 7 3 0 0
-                7 8 3 0 0
-                8 0 10000002 0 0
+            trim_text("""0 1 1 1 -0.69
+                1 2 2 0 0
+                2 0 3 0 0
+                0 3 1 2 -0.36
+                3 4 2 0 0
+                4 5 2 0 0
+                5 0 3 0 0
+                0 6 1 3 -0.36
+                6 7 2 0 0
+                7 8 2 0 0
+                8 0 4 0 0
                 0 0.0
                 """))
 
@@ -87,9 +87,9 @@ class TestLexiconFSTGenerator(unittest.TestCase):
 
         self.assertEqual(
             f_fst.getvalue(),
-            trim_text("""0 1 2 2 0
-                1 0 3 0 0
-                0 0 1 1 2.303
+            trim_text("""0 1 1 1 0
+                1 0 2 0 0
+                0 0 3 2 2.303
                 0 0.0
                 """))
 
@@ -108,8 +108,10 @@ class TestLexiconFSTGenerator(unittest.TestCase):
 
         self.assertEqual(
             f_fst.getvalue(),
-            trim_text("""0 1 2 2 0
-                1 0 3 0 0
-                0 0 1 0 2.303
+            trim_text("""0 1 1 1 0
+                1 0 2 0 0
+                0 0 3 2 2.303
                 0 0.0
                 """))
+        self.assertEqual(f_isym.getvalue(), trim_text("""<eps> 0\nh 1\ni 2\n<unk> 3\n"""))
+        self.assertEqual(f_osym.getvalue(), trim_text("""<eps> 0\nhi 1\n<capture_eps> 2\n"""))

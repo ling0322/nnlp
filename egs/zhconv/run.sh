@@ -27,7 +27,7 @@ for line in sys.stdin:
     if m.group(2) == "" or m.group(1) == "":
         continue
     print(f"{m.group(2)} 0.99 {symbols}")
-' > exp/t2s_lexicon.txt
+' | lexicon_add_ilabel_selfloop.py > exp/t2s_lexicon.txt
 
 build_lexicon_fst.sh exp/build_l exp/t2s_lexicon.txt exp/zhconv
 

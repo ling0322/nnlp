@@ -1,53 +1,50 @@
 ''' symbols for FST '''
 from __future__ import annotations
-from typing import Any, Optional, Union
 
-class Epsilon:
-    ''' represents an epsilon symbol in fst '''
+def escape_symbol(symbol: str) -> str:
+    ''' escape a symbol '''
 
-    def __str__(self) -> str:
-        return f'#eps'
+    value = symbol
+    value = value.replace('\\', '\\\\')
+    value = value.replace('<', '\\<')
+    value = value.replace('>', '\\>')
+    value = value.replace('#', '\\#')
+    return value
 
-    def __eq__(self, o: Any) -> bool:
-        return isinstance(o, Epsilon)
+def unescape_symbol(symbol: str) -> str:
+    ''' unescape a symbol '''
 
-class Unknown:
-    ''' represents an unknown symbol in fst
-    Args:
-        symbol_id: id of unknown symbol '''
+    value = symbol
+    value = value.replace('\\<', '<')
+    value = value.replace('\\>', '>')
+    value = value.replace('\\#', '#')
+    value = value.replace('\\\\', '\\')
+    return value
 
-    def __init__(self, symbol_id: int = 0) -> None:
-        self.symbol_id = symbol_id
+def is_special_symbol(symbol: str) -> bool:
+    ''' return true if it is a special symbol like: <eps>, #1, #2, ... '''
 
-    def __str__(self) -> str:
-        if self.symbol_id == 0:
-            return f'#unk'
-        else:
-            return f'#unk_{self.symbol_id}'
+    return symbol[0] in {'<', '#'}
 
-    def __eq__(self, o: Any) -> bool:
-        return isinstance(o, Unknown) and self.symbol_id == o.symbol_id
+def is_disambig_symbol(symbol: str) -> bool:
+    ''' returns true if it is a disambig symbol '''
 
-class Disambig:
-    ''' represent disambiguation symbol #1, #2, #3, ... in Fst
-    Args:
-        symbol_id: id of disambiguation symbol, 1 for #1, 2 for #2, ... '''
+    return symbol[0] == '#'
 
-    def __init__(self, symbol_id: int) -> None:
-        self.symbol_id = symbol_id
+def make_disambig_symbol(disambig_id: int) -> str:
+    ''' returns the disambig symbol by its id '''
 
-    def __str__(self) -> str:
-        return f'#{self.symbol_id}'
+    return f'#{disambig_id}'
 
-    def __eq__(self, o: Any) -> bool:
-        return isinstance(o, Disambig) and self.symbol_id == o.symbol_id
+# both input and output symbol
+EPS_SYM = '<eps>'
 
-EPS_SYM = Epsilon()
-EPS_SYM_ID = 0
-UNK_SYM = Unknown()
-UNK_SYM_ID = 1
+# input symbols
+UNK_SYM = '<unk>'
+ANY_SYM = '<any>'
 
-NUM_RESERVED_SYM = 2
-MAX_SYMBOLS = 10000000
-
-Symbol = Union[str, Epsilon, Unknown, Disambig]
+# only for output symbols, <capture> and <capture_eps> are used in pair with <unk> and <any> 
+# <capture> means unknwon or any matched and output the captured symbol
+# <capture_eps> means unknwon or any matched but do not output anything
+CAP_SYM = '<capture>'
+CAP_EPS_SYM = '<capture_eps>'  
