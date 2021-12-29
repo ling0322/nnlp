@@ -189,5 +189,3 @@ class RuleParser:
                 raise BNFSyntaxError(f'unexpected token: {token}')
             if token.type == BNFToken.EPSILON and len(rule.tokens) != 1:
                 raise BNFSyntaxError(f'_ should be only token of a rule')
-
-

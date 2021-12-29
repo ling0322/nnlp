@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import argparse
+from typing import Optional
 import typing
 import math
+import sys
 
-from nnlp.symbol import EPS_SYM_ID, MAX_SYMBOLS
+from nnlp.symbol import EPS_SYM, is_disambig_symbol
+from nnlp.fst import Fst
 
 from .fst_writer import TextFSTWriter
 from .lexicon_fst_generator import LexiconFSTGenerator
 from .util import read_lexicon
 
-
 if typing.TYPE_CHECKING:
-    from .lexicon_fst_generator import DisambigLexicon
+    from .lexicon_fst_generator import Lexicon
 
 
-def _write_lexicon(lexicon: DisambigLexicon, filename: str) -> None:
+def _write_lexicon(lexicon: Lexicon, filename: str) -> None:
     ''' write lexicon to file '''
     with open(filename, 'w', encoding='utf-8') as f:
         for word, symbols, log_weight in lexicon:
@@ -68,51 +70,68 @@ def build_lexicon_fst(args: list[str]) -> None:
     if cmd_args.output_disambig:
         _write_lexicon(diambig_lexicon, cmd_args.output_disambig)
 
-def _remove_fst_disambig(input_file: str, output_file: str) -> None:
+
+def _remove_fst_disambig(input_sym: str) -> None:
     ''' remove disambig symbols from text format FST '''
 
-    with open(input_file, encoding='utf-8') as f_in, \
-         open(output_file, 'w', encoding='utf-8') as f_out:
-        for line in f_in:
-            row = line.strip().split()
-            if len(row) in {4, 5}:
-                isymbol_id = int(row[2])
-                if isymbol_id > MAX_SYMBOLS:
-                    isymbol_id = EPS_SYM_ID
-                row[2] = str(isymbol_id)
-            
-            f_out.write(' '.join(row) + '\n')
+    # get disambig symbols set and eps symbol id from symbol file
+    disambig_isymbol_ids = set()
+    eps_isymbol_id: Optional[int] = None
 
-def _remove_syms_disambig(input_file: str, output_file: str) -> None:
-    ''' remove disambig symbols from text format symbols file '''
+    with open(input_sym, encoding='utf-8') as f_sym:
+        isymbols = Fst._read_symbols(f_sym)
 
-    with open(input_file, encoding='utf-8') as f_in, \
-         open(output_file, 'w', encoding='utf-8') as f_out:
-        for line in f_in:
-            row = line.strip().split()
-            isymbol_id = int(row[1])
-            if isymbol_id >= MAX_SYMBOLS:
-                continue
-            
-            f_out.write(' '.join(row) + '\n')
+    for symbol_id, symbol in enumerate(isymbols):
+        if is_disambig_symbol(symbol):
+            disambig_isymbol_ids.add(symbol_id)
+        if symbol == EPS_SYM:
+            eps_isymbol_id = symbol_id
+    if eps_isymbol_id == None:
+        raise Exception(f'unable to find id for <eps>')
+    assert isinstance(eps_isymbol_id, int)
+
+    # change diambig symbols to eps
+    for line in sys.stdin:
+        row = line.strip().split()
+        if len(row) in {4, 5}:
+            isymbol_id = int(row[2])
+            if isymbol_id in disambig_isymbol_ids:
+                isymbol_id = eps_isymbol_id
+            row[2] = str(isymbol_id)
+
+        sys.stdout.write(' '.join(row) + '\n')
+
+
+def _remove_syms_disambig() -> None:
+    ''' remove disambig symbols from symbol file stdin and write output to stdout '''
+
+    for line in sys.stdin:
+        row = line.strip().split()
+        symbol = row[0]
+        if is_disambig_symbol(symbol):
+            continue
+
+        sys.stdout.write(' '.join(row) + '\n')
+
 
 def remove_disambig(args: list[str]) -> None:
     ''' remove disambig symbols from text format FST '''
 
-    parser = argparse.ArgumentParser(prog="rm_disambig",
-                                     description='''remove disambig symbols from either text format FST (-input_fst) or
-                                                    lexicon (-input_lexicon)''')
-    parser.add_argument('-input_fst', help='input text format FST file')
-    parser.add_argument('-input_syms', help='input text format symbols file')
-    parser.add_argument('-output', help='output text format FST file')
-    cmd_args = parser.parse_args(args)
-
-    if cmd_args.output == None:
-        parser.print_help()
+    if not args:
+        print('Usage:')
+        print('    remove disambig from symbol file: cat <in-sym> | rm_disambig sym > <out-sym>')
+        print('    remove disambig from FST file: cat <in-fst> | rm_disambig fst -syms <in-sym> > <out-fst>')
         return
-
-    if cmd_args.input_fst and not cmd_args.input_syms:
-        _remove_fst_disambig(cmd_args.input_fst, cmd_args.output)
-    elif not cmd_args.input_fst and cmd_args.input_syms:
-        _remove_syms_disambig(cmd_args.input_syms, cmd_args.output)
     
+    if args[0] == 'sym':
+        _remove_syms_disambig()
+    elif args[0] == 'fst':
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-syms', help='input text format symbols file')
+        cmd_args = parser.parse_args(args[1: ])
+
+        if not cmd_args.syms:
+            print('-syms not specified')
+            return
+
+        _remove_fst_disambig(cmd_args.syms)

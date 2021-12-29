@@ -13,6 +13,11 @@ rename_L () {
 
 print_fstinfo () {
   fstinfo $work_dir/L.fst | egrep "(of states|of arcs|of final states|of .* epsilons)" | sed 's/  */ /g'
+
+  # exit when FST is empty
+  num_arcs=$(fstinfo $work_dir/L.fst | grep "# of arcs" | sed 's/# of arcs *//g')
+  [[ $num_arcs -le 0 ]] && exit 1
+
   echo
 }
 
@@ -41,7 +46,7 @@ python3 -m nnlp_tools build_lexicon_fst \
 echo "build_lexicon_fst.sh: convert and optimize the lexicon FST"
 echo "min - FST minimize"
 echo "det - FST determinize"
-echo "rmd - FST remove diambig symbols"
+echo "rds - FST remove diambig symbols"
 echo "rms - FST remove epsilon symbols"
 echo ""
 
@@ -60,21 +65,20 @@ rename_L
 print_fstinfo $work_dir/L.fst
 
 echo "rmd(min(det(L)))"
-fstprint $work_dir/L.fst > $work_dir/L.txt
-python3 -m nnlp_tools rm_disambig \
-    -input_fst $work_dir/L.txt \
-    -output $work_dir/L.rmd.txt && rm $work_dir/L.txt
-fstcompile $work_dir/L.rmd.txt $work_dir/L.out.fst
+fstprint $work_dir/L.fst |\
+  python3 -m nnlp_tools rm_disambig fst -syms $work_dir/isyms.txt |\
+  fstcompile > $work_dir/L.out.fst
 rename_L
 print_fstinfo $work_dir/L.fst
 
-echo "rms(rmd(min(det(L))))"
+echo "rms(rds(min(det(L))))"
 fstrmepslocal $work_dir/L.fst $work_dir/L.out.fst
 rename_L
 print_fstinfo $work_dir/L.fst
 
 echo "build_lexicon_fst.sh: remove diambig symbols in isyms.txt"
-python3 -m nnlp_tools rm_disambig -input_syms $work_dir/isyms.txt -output $work_dir/isyms.rmd.txt
+cat $work_dir/isyms.txt |\
+  python3 -m nnlp_tools rm_disambig sym > $work_dir/isyms.rmd.txt
 
 echo "build_lexicon_fst.sh: copy output files"
 cp $work_dir/isyms.rmd.txt $output_prefix.isyms.txt

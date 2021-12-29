@@ -172,4 +172,3 @@ class BNFTokenizer:
             raise BNFSyntaxError(f'unexpected end of expression')
 
         return class_name, tokens
-

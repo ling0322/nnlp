@@ -5,31 +5,31 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
-from nnlp.symbol import EPS_SYM, UNK_SYM, Disambig, Epsilon, Unknown
+from nnlp.symbol import escape_symbol
 
 if TYPE_CHECKING:
-    from nnlp.symbol import Symbol
-
     from .lexicon_fst_generator import Lexicon
     from .rule import Rule
 
 class BNFSyntaxError(Exception):
-    r''' raised when an invaid BNF expression string occured '''
+    ''' raised when an invaid BNF expression string occured '''
     pass
 
 
 def read_lexicon(filename: str) -> Lexicon:
-    ''' read lexicon from file, the lexicon format is:
-        <word> <probability> <symbol1> <symbol2> ... <symbolN>\\n '''
+    ''' 
+    read lexicon from file, the lexicon format is:
+        <word> <probability> <symbol1> <symbol2> ... <symbolN>\\n 
+    it will also escape symbols and words using escape_symbol() '''
     lexicon: Lexicon = []
     with open(filename, encoding='utf-8') as f:
         for line in f:
             try:
                 row = line.strip().split()
                 assert len(row) >= 3
-                word = row[0]
+                word = escape_symbol(row[0])
                 weight = -math.log(float(row[1]))
-                symbols = row[2:]
+                symbols = list(map(escape_symbol, row[2:]))
                 lexicon.append((word, symbols, weight))
             except Exception as _:
                 raise Exception(f'unexpected line in {filename}: {line.strip()}')
