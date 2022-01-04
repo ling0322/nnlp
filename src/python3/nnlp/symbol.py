@@ -9,6 +9,10 @@ def escape_symbol(symbol: str) -> str:
     value = value.replace('<', '\\<')
     value = value.replace('>', '\\>')
     value = value.replace('#', '\\#')
+    value = value.replace('\t', '\\t')
+    value = value.replace(' ', '\\s')
+    value = value.replace('\n', '\\n')
+    value = value.replace('\r', '\\r')
     return value
 
 def unescape_symbol(symbol: str) -> str:
@@ -18,6 +22,10 @@ def unescape_symbol(symbol: str) -> str:
     value = value.replace('\\<', '<')
     value = value.replace('\\>', '>')
     value = value.replace('\\#', '#')
+    value = value.replace('\\s', ' ')
+    value = value.replace('\\t', '\t')
+    value = value.replace('\\n', '\n')
+    value = value.replace('\\r', '\r')
     value = value.replace('\\\\', '\\')
     return value
 
@@ -48,3 +56,6 @@ ANY_SYM = '<any>'
 # <capture_eps> means unknwon or any matched but do not output anything
 CAP_SYM = '<capture>'
 CAP_EPS_SYM = '<capture_eps>'  
+
+# for Segmenters
+BRK_SYM = '<break>'

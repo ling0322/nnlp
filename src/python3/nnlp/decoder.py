@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional, Sequence, Union
 import math
 
 from .fst import Fst
-from .symbol import CAP_EPS_SYM, EPS_SYM, UNK_SYM, CAP_SYM, escape_symbol, is_special_symbol, unescape_symbol
+from .symbol import BRK_SYM, CAP_EPS_SYM, EPS_SYM, UNK_SYM, CAP_SYM, escape_symbol, is_special_symbol, unescape_symbol
 if TYPE_CHECKING:
     InputSymbol = Union[str, tuple[str, str]]
 
@@ -131,6 +131,9 @@ class FstDecoder:
                     if not capture_queue:
                         raise Exception(f'capture mismatch')
                     capture_symbol = capture_queue.popleft()
+                elif symbol in {BRK_SYM}:
+                    # symbols to output
+                    outputs.append(unescape_symbol(symbol))
                 else:
                     raise Exception(f'unexpected output symbol: {symbol}')
             else:

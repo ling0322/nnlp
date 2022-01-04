@@ -8,13 +8,28 @@ from typing import TYPE_CHECKING
 from nnlp.symbol import escape_symbol
 
 if TYPE_CHECKING:
-    from .lexicon_fst_generator import Lexicon
+    from .lexicon_fst_builder import Lexicon
     from .rule import Rule
 
 class BNFSyntaxError(Exception):
     ''' raised when an invaid BNF expression string occured '''
     pass
 
+def read_symbol_table(symbols_file: str) -> dict[str, int]:
+    ''' read symbol table from file '''
+
+    symbol_table: dict[str, int] = {}
+    with open(symbols_file, encoding='utf-8') as f:
+        for line in f:
+            row = line.strip().split()
+            if len(row) != 2:
+                raise Exception(f'invalid line in symbol_stream: {line.strip()}')
+            symbol: str = row[0]
+            symbol_id = int(row[1])
+
+            symbol_table[symbol] = symbol_id
+
+    return symbol_table
 
 def read_lexicon(filename: str) -> Lexicon:
     ''' 
