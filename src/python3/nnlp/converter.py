@@ -1,4 +1,3 @@
-
 from .decoder import FstDecoder
 from .fst import Fst
 

@@ -20,8 +20,6 @@ Usage: cat <lexicon-in> | python3 lexicon_add_ilabel_selfloop.py > <lexicon-out>
 
 import sys
 
-from nnlp.symbol import UNK_SYM
-
 UNK_FACTOR = 0.1
 
 ivocab = set()

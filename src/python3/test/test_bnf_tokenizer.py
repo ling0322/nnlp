@@ -57,3 +57,16 @@ class TestBNFTokenizer(unittest.TestCase):
         self.assertRaises(BNFSyntaxError, tokenizer, '<hello world> ::= "hello" "world')
         self.assertRaises(BNFSyntaxError, tokenizer, '<hello:world> ::= "hello" "world')
         self.assertRaises(BNFSyntaxError, tokenizer, 'hello> ::= "hello"')
+
+
+    def test_tokenizer_macro(self):
+        ''' test tokenizer for macro call '''
+
+        tokenizer = BNFTokenizer()
+        name, tokens = tokenizer('<hello> ::= !read_lexicon("lexicon.txt") "world"')
+
+        self.assertEqual(name, 'hello')
+        self.assertListEqual(tokens, [
+            BNFToken(BNFToken.MACRO_READ_LEXICON, 'lexicon.txt'),
+            BNFToken(BNFToken.SYMBOL, 'world'),
+        ])

@@ -100,6 +100,28 @@ class BNFTokenizer:
         else:
             return None
 
+    def _read_macro(self) -> Optional[BNFToken]:
+        ''' read a macro from self._expression[self._offset: ], returns (MACRO_*, paramater) if
+        success, otherwise returns None'''
+
+        if self._expression[self._offset] == '!':
+            lp_pos = self._expression.find('("', self._offset + 1)
+            if lp_pos == -1:
+                raise BNFSyntaxError(f'invalid macro')
+            macro_name = self._expression[self._offset + 1: lp_pos].strip()
+            rp_pos = self._expression.find('")', lp_pos + 2)
+            if rp_pos == -1:
+                raise BNFSyntaxError(f'invalid macro')
+            macro_param = self._expression[lp_pos + 2: rp_pos]
+            self._offset = rp_pos + 2
+
+            if macro_name == 'read_lexicon':
+                return BNFToken(BNFToken.MACRO_READ_LEXICON, macro_param)
+            else:
+                raise BNFSyntaxError(f'invalid macro name: {macro_name}')
+        else:
+            return None
+
     def _read_define(self) -> Optional[BNFToken]:
         r''' read a define token ::= from self._expression[self._offset: ]
         On success, returns (DEFINE, '') else returns None'''
@@ -143,6 +165,8 @@ class BNFTokenizer:
             ch = self._expression[self._offset]
             if ch == '"' or ch == '_':
                 token = self._read_symbol()
+            elif ch == '!':
+                token = self._read_macro()
             elif ch == '|':
                 token = BNFToken(BNFToken.OR)
                 self._offset += 1

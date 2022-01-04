@@ -8,8 +8,8 @@ from nnlp_tools.bnf_tokenizer import BNFTokenizer
 from nnlp_tools.rule_parser import RuleParser
 from nnlp_tools.fst_generator import FSTGenerator
 from nnlp_tools.util import SourcePosition, generate_rule_set
-from nnlp_tools.lexicon_fst_generator import LexiconFSTGenerator
-from nnlp_tools.fst_writer import TextFSTWriter
+from nnlp_tools.lexicon_fst_builder import LexiconFstBuilder
+from nnlp_tools.fst_writer import FstWriter
 
 class TestFstDecoder(unittest.TestCase):
 
@@ -27,7 +27,7 @@ class TestFstDecoder(unittest.TestCase):
         f_isym = io.StringIO()
         f_osym = io.StringIO()
 
-        fst_writer = TextFSTWriter(f_fst, f_isym, f_osym)
+        fst_writer = FstWriter(f_fst, f_isym, f_osym)
         fst_generator(rule_set, 'root', fst_writer)
         fst = Fst.from_text(io.StringIO(f_isym.getvalue()), io.StringIO(f_osym.getvalue()),
                             io.StringIO(f_fst.getvalue()))
@@ -38,15 +38,15 @@ class TestFstDecoder(unittest.TestCase):
     def test_decoder_escape_symbol(self):
         ''' test the decoder with FST build with unknown_symbol="output"  '''
 
-        fst_generator = LexiconFSTGenerator()
+        fst_builder = LexiconFstBuilder()
         lexicon = [('\#0', ('\<eps\>', '\#1'), 0)]
 
         f_fst = io.StringIO()
         f_isym = io.StringIO()
         f_osym = io.StringIO()
 
-        fst_writer = TextFSTWriter(f_fst, f_isym, f_osym)
-        fst_generator(lexicon, fst_writer)
+        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
+            fst_builder(lexicon, fst_writer)
 
         fst = Fst.from_text(io.StringIO(f_isym.getvalue()), io.StringIO(f_osym.getvalue()),
                             io.StringIO(f_fst.getvalue()))
@@ -56,15 +56,17 @@ class TestFstDecoder(unittest.TestCase):
     def test_decoder_unk_output(self):
         ''' test the decoder with FST build with unknown_symbol="output"  '''
 
-        fst_generator = LexiconFSTGenerator()
+        fst_builder = LexiconFstBuilder()
         lexicon = [('hi', ('h', 'i'), 0)]
 
         f_fst = io.StringIO()
         f_isym = io.StringIO()
         f_osym = io.StringIO()
 
-        fst_writer = TextFSTWriter(f_fst, f_isym, f_osym)
-        fst_generator(lexicon, fst_writer, unknown_symbol='output')
+        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
+            fst_builder(lexicon, fst_writer)
+            fst_writer.add_arc(0, 0, '<unk>', '<capture>')
+
 
         fst = Fst.from_text(io.StringIO(f_isym.getvalue()), io.StringIO(f_osym.getvalue()),
                             io.StringIO(f_fst.getvalue()))
@@ -74,15 +76,16 @@ class TestFstDecoder(unittest.TestCase):
     def test_decoder_unk_ignore(self):
         ''' test the decoder with FST build with unknown_symbol="ignore"  '''
 
-        fst_generator = LexiconFSTGenerator()
+        fst_builder = LexiconFstBuilder()
         lexicon = [('hi', ('h', 'i'), 0)]
 
         f_fst = io.StringIO()
         f_isym = io.StringIO()
         f_osym = io.StringIO()
 
-        fst_writer = TextFSTWriter(f_fst, f_isym, f_osym)
-        fst_generator(lexicon, fst_writer, unknown_symbol='ignore')
+        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
+            fst_builder(lexicon, fst_writer)
+            fst_writer.add_arc(0, 0, '<unk>', '<capture_eps>')
 
         fst = Fst.from_text(io.StringIO(f_isym.getvalue()), io.StringIO(f_osym.getvalue()),
                             io.StringIO(f_fst.getvalue()))

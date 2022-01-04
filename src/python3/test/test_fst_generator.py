@@ -5,7 +5,7 @@ from nnlp_tools.bnf_tokenizer import BNFTokenizer
 from nnlp_tools.rule_parser import RuleParser
 from nnlp_tools.fst_generator import FSTGenerator
 from nnlp_tools.util import SourcePosition, generate_rule_set
-from nnlp_tools.fst_writer import TextFSTWriter
+from nnlp_tools.fst_writer import FstWriter
 
 from .util import trim_text
 
@@ -27,8 +27,8 @@ class TestFSTGenerator(unittest.TestCase):
         f_isym = io.StringIO()
         f_osym = io.StringIO()
 
-        fst_writer = TextFSTWriter(f_fst, f_isym, f_osym)
-        fst_generator(rule_set, 'root', fst_writer)
+        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
+            fst_generator(rule_set, 'root', fst_writer)
 
         self.assertEqual(
             f_fst.getvalue(),
