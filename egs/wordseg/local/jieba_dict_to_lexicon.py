@@ -3,6 +3,8 @@
 ''' convert jieba dictionary to nnlp lexicon format '''
 import sys
 
+from nnlp.symbol import escape_symbol
+
 freq = {}
 for line in sys.stdin:
     row = line.strip().split()
@@ -13,4 +15,4 @@ for line in sys.stdin:
 total_count = sum(freq.values())
 
 for word, count in freq.items():
-    sys.stdout.write(f'{word} {count / total_count:.5g} {" ".join(list(word))}\n')
+    sys.stdout.write(f'{escape_symbol(word)} {count / total_count:.5g} {" ".join(map(escape_symbol, word))}\n')

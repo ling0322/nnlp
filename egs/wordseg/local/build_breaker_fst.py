@@ -18,6 +18,7 @@ prefix = cmd_args.out_prefix
 
 isymbols = read_symbol_table(cmd_args.syms_file)
 
+concat_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_."
 
 with open(f'{prefix}.txt', 'w') as f_fst, \
      open(f'{prefix}.isyms.txt', 'w') as f_isyms, \
@@ -26,21 +27,24 @@ with open(f'{prefix}.txt', 'w') as f_fst, \
      FstWriter(f_fst, cmd_args.syms_file, f_osyms) as fst_writer:
     state_1 = fst_writer.create_state()
     for symbol in isymbols.keys():
-        if not is_special_symbol(symbol):
-            fst_writer.add_arc(0, state_1, symbol, symbol)
+        if  symbol not in concat_set and not is_special_symbol(symbol):
+            if symbol in {r'\s', r'\t', r'\r', r'\n'}:
+                fst_writer.add_arc(0, state_1, symbol, EPS_SYM)
+            else:
+                fst_writer.add_arc(0, state_1, symbol, symbol)
     
     # handle unknown symbols
     state_2 = fst_writer.create_state()
-    fst_writer.add_arc(0, state_2, UNK_SYM, CAP_SYM, 1)
-    fst_writer.add_arc(state_2, state_2, UNK_SYM, CAP_SYM)
+    fst_writer.add_arc(0, state_2, UNK_SYM, CAP_SYM, 10)
     fst_writer.add_arc(state_2, 0, EPS_SYM, BRK_SYM)
 
-    # handle space symbols
-    fst_writer.add_arc(0, 0, r'\s', BRK_SYM)
-    fst_writer.add_arc(0, 0, r'\t', BRK_SYM)
-    fst_writer.add_arc(0, 0, r'\r', BRK_SYM)
-    fst_writer.add_arc(0, 0, r'\n', BRK_SYM)
-    
+    # handle concat set
+    state_3 = fst_writer.create_state()
+    for symbol in concat_set:
+        fst_writer.add_arc(0, state_3, symbol, symbol, 10)
+        fst_writer.add_arc(state_3, state_3, symbol, symbol)
+    fst_writer.add_arc(state_3, 0, EPS_SYM, BRK_SYM)
+
     # output the break symbol
     fst_writer.add_arc(state_1, 0, EPS_SYM, BRK_SYM)
     fst_writer.set_final_state(0)

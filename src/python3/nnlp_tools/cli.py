@@ -32,6 +32,7 @@ def build_lexicon_fst(args: list[str]) -> None:
             'build lexicon fst from text file. \n' +
             'the lexicon format is "<word> <probability> <symbol1> <symbol2> ... <symbolN>\\n')
     parser.add_argument('-lexicon', required=True, help='input text file')
+    parser.add_argument('-escaped', action='store_true', help='true if the lexicon is escaped')
     parser.add_argument('-ilabel', required=True, help='output ilabel file')
     parser.add_argument('-olabel', required=True, help='output olabel file')
     parser.add_argument('-fst', help='output text .fst file')
@@ -42,7 +43,7 @@ def build_lexicon_fst(args: list[str]) -> None:
     fst_generator = LexiconFstBuilder()
 
     # read lexicon
-    lexicon = read_lexicon(cmd_args.lexicon)
+    lexicon = read_lexicon(cmd_args.lexicon, cmd_args.escaped)
 
     # open output files
     with open(cmd_args.ilabel, 'w', encoding='utf-8') as f_isym, \
