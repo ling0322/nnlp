@@ -31,20 +31,28 @@ def read_symbol_table(symbols_file: str) -> dict[str, int]:
 
     return symbol_table
 
-def read_lexicon(filename: str) -> Lexicon:
+def read_lexicon(filename: str, is_escaped: bool) -> Lexicon:
     ''' 
     read lexicon from file, the lexicon format is:
         <word> <probability> <symbol1> <symbol2> ... <symbolN>\\n 
-    it will also escape symbols and words using escape_symbol() '''
+    it will also escape symbols and words using escape_symbol()
+    Args:
+        is_escaped (bool): true if the lexicon is escaped '''
+
     lexicon: Lexicon = []
     with open(filename, encoding='utf-8') as f:
         for line in f:
             try:
                 row = line.strip().split()
                 assert len(row) >= 3
-                word = escape_symbol(row[0])
+                if is_escaped:
+                    word = row[0]
+                    symbols = list(row[2:])
+                else:
+                    word = escape_symbol(row[0])
+                    symbols = list(map(escape_symbol, row[2:]))
                 weight = -math.log(float(row[1]))
-                symbols = list(map(escape_symbol, row[2:]))
+                
                 lexicon.append((word, symbols, weight))
             except Exception as _:
                 raise Exception(f'unexpected line in {filename}: {line.strip()}')

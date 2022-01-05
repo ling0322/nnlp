@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .decoder import FstDecoder
 from .fst import Fst
 from .symbol import BRK_SYM

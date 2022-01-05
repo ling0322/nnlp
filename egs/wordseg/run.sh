@@ -43,6 +43,9 @@ echo "process jieba dict"
 cat $local_data_dir/dict.txt.small |\
   local/jieba_dict_to_lexicon.py |\
   lexicon_add_ilabel_selfloop.py > exp/lexicon.small.txt
+
+cat local/lexicon_additional_selfloop.txt >> exp/lexicon.small.txt
+
 echo "done"
 echo
 
@@ -59,7 +62,7 @@ echo
 echo "L"
 [ -d exp/build_fst ] && rm -r exp/build_fst
 mkdir exp/build_fst
-python3 -m nnlp_tools buildlexfst \
+python3 -m nnlp_tools buildlexfst -escaped \
     -lexicon exp/lexicon.small.txt \
     -ilabel exp/build_fst/L.isyms.txt \
     -olabel exp/build_fst/L.osyms.txt \
@@ -67,11 +70,6 @@ python3 -m nnlp_tools buildlexfst \
     -output_disambig exp/build_fst/L.disambig.txt
 fstcompile exp/build_fst/L.txt exp/build_fst/L.fst
 
-add_selfloop.sh exp/build_fst/L "<unk>" "<unk>" 
-add_selfloop.sh exp/build_fst/L "\s" "\s" 
-add_selfloop.sh exp/build_fst/L "\r" "\r" 
-add_selfloop.sh exp/build_fst/L "\t" "\t" 
-add_selfloop.sh exp/build_fst/L "\n" "\n" 
 print_fstinfo exp/build_fst/L.fst
 
 echo "B"
