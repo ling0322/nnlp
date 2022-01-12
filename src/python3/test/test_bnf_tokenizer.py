@@ -19,7 +19,7 @@ class TestBNFTokenizer(unittest.TestCase):
             BNFToken(BNFToken.SYMBOL, 'world'),
         ])
 
-        name, tokens = tokenizer(' <hello> ::= ( "hello" | < world>) \t ')
+        name, tokens = tokenizer(' <hello> ::= ( "hello" | < world>) \t ; 1.0')
         self.assertEqual(name, 'hello')
         self.assertListEqual(tokens, [
             BNFToken(BNFToken.LEFT_PARENTHESIS),
@@ -27,6 +27,7 @@ class TestBNFTokenizer(unittest.TestCase):
             BNFToken(BNFToken.OR),
             BNFToken(BNFToken.CLASS, 'world'),
             BNFToken(BNFToken.RIGHT_PARENTHESIS),
+            BNFToken(BNFToken.WEIGHT, '1.0'),
         ])
 
         name, tokens = tokenizer('<hello> ::= (_:"hello")? ( "world":_ )*')

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from nnlp_tools.grammar import Grammar
+
 from .common import BNFToken
 from .rule import Rule
 from .util import BNFSyntaxError
@@ -9,22 +11,21 @@ from nnlp.symbol import EPS_SYM
 from nnlp_tools.fst_writer import FstWriter
 
 
-class FSTGenerator:
-    r''' generate FST from rule set '''
+class GrammarFstBuilder:
+    ''' generate FST from grammar '''
 
-    def __call__(self, rule_set: dict[str, set[Rule]], root: str, fst_writer: FstWriter) -> None:
-        r''' generate FST from a rule set, and write the FST to file using fst_writer
+    def __call__(self, grammar: Grammar, fst_writer: FstWriter) -> None:
+        r''' generate FST from grammar, and write the FST to file using fst_writer
              Args:
-                 rule_set (Dict[str, Set[Rule]]): the rule set
-                 root (str): name of the root node
+                 grammar (Grammar): the grammar to build FST
                  fst_writer (FstWriter): the fst writer'''
 
-        self._rule_set: dict[str, set[Rule]] = rule_set
-        self._fst_writer: FstWriter = fst_writer
+        self._grammar = grammar
+        self._fst_writer = fst_writer
 
         # build the FST
         begin_state = 0
-        final_state = self._generate_class(root, [], begin_state)
+        final_state = self._generate_class(grammar.root_class, [], begin_state)
         fst_writer.set_final_state(final_state)
         fst_writer.write()
 
@@ -60,18 +61,25 @@ class FSTGenerator:
         class_history = class_history.copy()
         class_history.append(name)
 
-        rules = self._rule_set[name]
+        rules = self._grammar.rule_set[name]
         dest_state = self._fst_writer.create_state()
+
+        # if there is more than 1 rules in the class, we need the disambig symbol
+        need_disambig = len(rules) > 1
+
         for rule in rules:
             state = self._generate_rule(rule, class_history, src_state)
             self._fst_writer.add_arc(state, dest_state, EPS_SYM, EPS_SYM)
 
         return dest_state
 
-    def _generate_token(self, token: BNFToken, class_history: list[str], src_state: int) -> int:
+    def _generate_token(self, token: BNFToken, class_history: list[str], src_state: int,
+                        weight: float) -> int:
         r''' generate FST for one token, returns the last state '''
 
         dest_state = src_state
+
+        # weight will add only once and the weight for remaining arcs is zero
 
         if token.type == BNFToken.SYMBOL:
             isymbols = self._get_symbols(token, 'i')
@@ -80,21 +88,24 @@ class FSTGenerator:
 
             for isym, osym in zip(isymbols, osymbols):
                 state = self._fst_writer.create_state()
-                self._fst_writer.add_arc(dest_state, state, isym, osym)
+                self._fst_writer.add_arc(dest_state, state, isym, osym, weight)
+                weight = 0
                 dest_state = state
 
         elif token.type == BNFToken.I_SYMBOL:
             isymbols = self._get_symbols(token, 'i')
             for isym in isymbols:
                 state = self._fst_writer.create_state()
-                self._fst_writer.add_arc(dest_state, state, isym, EPS_SYM)
+                self._fst_writer.add_arc(dest_state, state, isym, EPS_SYM, weight)
+                weight = 0
                 dest_state = state
 
         elif token.type == BNFToken.O_SYMBOL:
             osymbols = self._get_symbols(token, 'o')
             for osym in osymbols:
                 state = self._fst_writer.create_state()
-                self._fst_writer.add_arc(dest_state, state, EPS_SYM, osym)
+                self._fst_writer.add_arc(dest_state, state, EPS_SYM, osym, weight)
+                weight = 0
                 dest_state = state
 
         elif token.type == BNFToken.CLASS:
@@ -107,15 +118,17 @@ class FSTGenerator:
         r''' generate FST from one single rule, returns the last state '''
 
         start_state = src_state
+        weight = rule.weight
         if rule.flag == '*':
             # we need an additional state for repeat rules
             start_state = self._fst_writer.create_state()
-            self._fst_writer.add_arc(src_state, start_state, EPS_SYM, EPS_SYM)
+            self._fst_writer.add_arc(src_state, start_state, EPS_SYM, EPS_SYM, weight)
+            weight = 0
 
         # generate FST for each rule
         state = start_state
         for token in rule.tokens:
-            state = self._generate_token(token, class_history, state)
+            state = self._generate_token(token, class_history, state, weight)
 
         # add an epsilon arc from state to start_state if we have a repeat flag
         if rule.flag == '*':

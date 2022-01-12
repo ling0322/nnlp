@@ -14,6 +14,7 @@ class BNFToken:
     QUESTION = 8  # ?
     ASTERISK = 9  # *
     EPSILON = 10  # _
+    WEIGHT = 11 # ; 0.9
     MACRO_READ_LEXICON = 100  # !read_lexicon("<lexicon-file>")
     END = 10001  # end of experssion (only used in rule parser)
     DEFINE = 10002  # ::=
@@ -39,6 +40,8 @@ class BNFToken:
             return f'<{self.value}>'
         elif self.type == self.MACRO_READ_LEXICON:
             return f'!read_lexicon("{self.value}")'
+        elif self.type == self.WEIGHT:
+            return f'; {self.value}'
         else:
             return _REPR[self.type]
 

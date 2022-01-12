@@ -6,8 +6,9 @@ from nnlp.fst import Fst
 
 from nnlp_tools.bnf_tokenizer import BNFTokenizer
 from nnlp_tools.rule_parser import RuleParser
-from nnlp_tools.fst_generator import FSTGenerator
-from nnlp_tools.util import SourcePosition, generate_rule_set
+from nnlp_tools.grammar import Grammar
+from nnlp_tools.grammar_fst_builder import GrammarFstBuilder
+from nnlp_tools.util import SourcePosition
 from nnlp_tools.lexicon_fst_builder import LexiconFstBuilder
 from nnlp_tools.fst_writer import FstWriter
 
@@ -18,17 +19,18 @@ class TestFstDecoder(unittest.TestCase):
 
         tokenizer = BNFTokenizer()
         parser = RuleParser()
-        fst_generator = FSTGenerator()
+        fst_builder = GrammarFstBuilder()
 
         rules = parser(*tokenizer('<root> ::= ("hi":_ _:"hello")* '), SourcePosition())
+        grammar = Grammar(rules, "root")
 
-        rule_set = generate_rule_set(rules)
         f_fst = io.StringIO()
         f_isym = io.StringIO()
         f_osym = io.StringIO()
 
-        fst_writer = FstWriter(f_fst, f_isym, f_osym)
-        fst_generator(rule_set, 'root', fst_writer)
+        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
+            fst_builder(grammar, fst_writer)
+
         fst = Fst.from_text(io.StringIO(f_isym.getvalue()), io.StringIO(f_osym.getvalue()),
                             io.StringIO(f_fst.getvalue()))
 

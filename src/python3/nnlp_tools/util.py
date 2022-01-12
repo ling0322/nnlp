@@ -65,14 +65,5 @@ class SourcePosition:
         self._filename = fileanme
         self._line = line
 
-def generate_rule_set(rule_list: list[Rule]) -> dict[str, set[Rule]]:
-    r''' generate rule set from rule list '''
 
-    rule_set: dict[str, set[Rule]] = {}
-    for rule in rule_list:
-        if rule.class_name not in rule_set:
-            rule_set[rule.class_name] = set()
-        rule_set[rule.class_name].add(rule)
-    
-    return rule_set
 
