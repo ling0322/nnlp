@@ -36,10 +36,13 @@ class RuleParser:
                  source (SourcePosition): position of the rule in source file '''
 
         rules: Iterable[Rule] = [Rule(name, tokens, source)]
+
+        # one rule may generate multiple rules, so we use sum here
         rules = sum(map(self._replace_sub_rule, rules), [])
         rules = sum(map(self._split_alternatives, rules), [])
         rules = list(rules)
         for rule in rules:
+            self._parse_weight(rule)
             self._verify_rule(rule)
 
         return rules
@@ -56,6 +59,23 @@ class RuleParser:
                 break
 
         return sub_name
+    
+    def _parse_weight(self, rule: Rule) -> None:
+        ''' parse weight token in rule, will modify the rule DIRECTLY '''
+
+        if rule.tokens[-1].type == BNFToken.WEIGHT:
+            weight_token = rule.tokens.pop()
+
+            assert weight_token.value
+            rule.weight = float(weight_token.value)
+
+        # check the rule again
+        if not rule.tokens:
+            raise BNFSyntaxError(f'rule is empty (except a weight token)')
+        for token in rule.tokens:
+            if token.type == BNFToken.WEIGHT:
+                raise BNFSyntaxError(f'unexpected weight token')
+        
 
     def _replace_sub_rule(self, rule: Rule) -> List[Rule]:
         r''' do two things: 1) replace sub rules. 2) parse flag. For example:

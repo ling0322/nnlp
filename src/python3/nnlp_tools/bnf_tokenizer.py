@@ -4,19 +4,15 @@ import re
 from .util import BNFSyntaxError
 from .common import BNFToken
 
-
 class BNFTokenizer:
-    r''' convert BNF experession string to tokens, also it will handle some grammer sugars
-    for example,
-        <hello> ::= "hello" -> <hello> ::= "hello":"hello"
-        <hi> ::= @"hi" -> <hello> ::= "h":"h" "i":"i"
-        <hi> ::= @"hi":_ -> <hello> ::= "h":_ "i":_    # _ is the epsilon symbol
-    '''
+    ''' convert BNF experession string to tokens '''
 
     def __init__(self):
         self._re_special_char = re.compile(r'[ \t:]')
         self._offset = 0
         self._expression = ''
+
+        self._re_weight = re.compile(r'; ([0-9]+(:?\.[0-9]+))')
 
     def _discard_space(self) -> None:
         r''' read and discard spaces '''
@@ -28,6 +24,16 @@ class BNFTokenizer:
         if self._offset >= len(self._expression):
             return True
         return False
+    
+    def _read_weight(self) -> Optional[BNFToken]:
+        ''' read a weight token from self._expression[self._offset: ], for example, "; 0.9" '''
+
+        match = self._re_weight.match(self._expression, self._offset)
+        if not match:
+            return None
+        
+        self._offset += len(match.group(0))
+        return BNFToken(BNFToken.WEIGHT, match.group(1))
 
     def _read_symbol(self) -> Optional[BNFToken]:
         r''' read a symbol token from self._expression[self._offset: ], the symbol token contains
@@ -167,6 +173,8 @@ class BNFTokenizer:
                 token = self._read_symbol()
             elif ch == '!':
                 token = self._read_macro()
+            elif ch == ';':
+                token = self._read_weight()
             elif ch == '|':
                 token = BNFToken(BNFToken.OR)
                 self._offset += 1
