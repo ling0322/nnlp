@@ -10,7 +10,7 @@ from nnlp_tools.grammar import Grammar
 from nnlp_tools.grammar_fst_builder import GrammarFstBuilder
 from nnlp_tools.util import SourcePosition
 from nnlp_tools.lexicon_fst_builder import LexiconFstBuilder
-from nnlp_tools.fst_writer import FstWriter
+from nnlp_tools.mutable_fst import MutableFst
 
 class TestFstDecoder(unittest.TestCase):
 
@@ -24,15 +24,11 @@ class TestFstDecoder(unittest.TestCase):
         rules = parser(*tokenizer('<root> ::= ("hi":_ _:"hello")* '), SourcePosition())
         grammar = Grammar(rules, "root")
 
-        f_fst = io.StringIO()
-        f_isym = io.StringIO()
-        f_osym = io.StringIO()
+        mutable_fst = MutableFst()
+        fst_builder(grammar, mutable_fst)
 
-        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
-            fst_builder(grammar, fst_writer)
-
-        fst = Fst.from_text(io.StringIO(f_isym.getvalue()), io.StringIO(f_osym.getvalue()),
-                            io.StringIO(f_fst.getvalue()))
+        json_io = io.StringIO(mutable_fst.to_json())
+        fst = Fst.from_json(json_io)
 
         decoder = FstDecoder(fst)
         self.assertListEqual(decoder.decode_sequence('hihihi'), ["hello"] * 3)
@@ -43,15 +39,11 @@ class TestFstDecoder(unittest.TestCase):
         fst_builder = LexiconFstBuilder()
         lexicon = [('\#0', ('\<eps\>', '\#1'), 0)]
 
-        f_fst = io.StringIO()
-        f_isym = io.StringIO()
-        f_osym = io.StringIO()
+        mutable_fst = MutableFst()
+        fst_builder(lexicon, mutable_fst)
 
-        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
-            fst_builder(lexicon, fst_writer)
-
-        fst = Fst.from_text(io.StringIO(f_isym.getvalue()), io.StringIO(f_osym.getvalue()),
-                            io.StringIO(f_fst.getvalue()))
+        json_io = io.StringIO(mutable_fst.to_json())
+        fst = Fst.from_json(json_io)
         decoder = FstDecoder(fst)
         self.assertListEqual(decoder.decode_sequence(['<eps>', '#1']), ['#0'])
 
@@ -61,18 +53,14 @@ class TestFstDecoder(unittest.TestCase):
         fst_builder = LexiconFstBuilder()
         lexicon = [('hi', ('h', 'i'), 0)]
 
-        f_fst = io.StringIO()
-        f_isym = io.StringIO()
-        f_osym = io.StringIO()
+        mutable_fst = MutableFst()
+        fst_builder(lexicon, mutable_fst)
+        mutable_fst.add_arc(0, 0, '<unk>', '<capture>')
 
-        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
-            fst_builder(lexicon, fst_writer)
-            fst_writer.add_arc(0, 0, '<unk>', '<capture>')
-
-
-        fst = Fst.from_text(io.StringIO(f_isym.getvalue()), io.StringIO(f_osym.getvalue()),
-                            io.StringIO(f_fst.getvalue()))
+        json_io = io.StringIO(mutable_fst.to_json())
+        fst = Fst.from_json(json_io)
         decoder = FstDecoder(fst)
+
         self.assertListEqual(decoder.decode_sequence('hibar'), ['hi', 'b', 'a', 'r'])
         
     def test_decoder_unk_ignore(self):
@@ -81,16 +69,13 @@ class TestFstDecoder(unittest.TestCase):
         fst_builder = LexiconFstBuilder()
         lexicon = [('hi', ('h', 'i'), 0)]
 
-        f_fst = io.StringIO()
-        f_isym = io.StringIO()
-        f_osym = io.StringIO()
+        mutable_fst = MutableFst()
+        fst_builder(lexicon, mutable_fst)
+        mutable_fst.add_arc(0, 0, '<unk>', '<capture_eps>')
 
-        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
-            fst_builder(lexicon, fst_writer)
-            fst_writer.add_arc(0, 0, '<unk>', '<capture_eps>')
-
-        fst = Fst.from_text(io.StringIO(f_isym.getvalue()), io.StringIO(f_osym.getvalue()),
-                            io.StringIO(f_fst.getvalue()))
+        json_io = io.StringIO(mutable_fst.to_json())
+        fst = Fst.from_json(json_io)
         decoder = FstDecoder(fst)
+
         outputs = decoder.decode_sequence('hibar')
         self.assertListEqual(outputs, ['hi'])

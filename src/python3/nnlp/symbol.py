@@ -37,7 +37,7 @@ def is_special_symbol(symbol: str) -> bool:
 def is_disambig_symbol(symbol: str) -> bool:
     ''' returns true if it is a disambig symbol '''
 
-    return symbol[0] == '#'
+    return isinstance(symbol, str) and symbol != '' and symbol[0] == '#'
 
 def make_disambig_symbol(disambig_id: int) -> str:
     ''' returns the disambig symbol by its id '''

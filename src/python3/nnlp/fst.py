@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 class Fst:
     r''' 
-    stores the symbol and graph data of FST. 
+    stores the symbol and graph data of a const FST. 
     Usage:
         # load FST from text file
         fst = Fst.from_text(isymbol_file, osymbol_file, fst_file) '''
@@ -30,22 +30,6 @@ class Fst:
 
         # all input string symbols
         self._isymbol_dict: dict[str, int] = {}
-
-
-    def to_json(self, f_json: TextIO) -> None:
-        ''' dump the FST to json file '''
-
-        graph = self._graph
-        final_weights = list(self._final_weights.items())
-        isymbol_dict = self._isymbol_dict
-
-        o = dict(
-            version=1,
-            graph=graph,
-            isymbol_dict=isymbol_dict,
-            final_weights=final_weights
-        )
-        return json.dump(o, f_json, separators=(',', ':'))
 
     @classmethod
     def from_json(cls, f_json: Union[TextIO, str]) -> Fst:
@@ -65,61 +49,6 @@ class Fst:
 
         return fst
 
-    @classmethod
-    def from_text(cls, ilabel_input: TextIO, olabel_input: TextIO, fst_input: TextIO) -> Fst:
-        r''' 
-        load fst from openFST format streams
-        Args:
-            ilabel_input (TextIO): ilabel symbol stream
-            olabel_input (TextIO): olabel symbol stream
-            fst_input (TextIO): fst stream 
-        Returns:
-            the Fst'''
-
-        fst = Fst()
-
-        isymbols: list[str] = fst._read_symbols(ilabel_input)
-        for isym_id, isymbol in enumerate(isymbols):
-            fst._isymbol_dict[isymbol] = isym_id
-        osymbols = fst._read_symbols(olabel_input)
-
-        for line in fst_input:
-            # src dest ilabel olabel [weight]  <- arc
-            # state [weight]                   <- final state
-            row = line.strip().split()
-            if len(row) in {4, 5}:
-                src_state = int(row[0])
-                dest_state = int(row[1])
-                isymbol_id: int = int(row[2])
-                osymbol_id: int = int(row[3])
-                weight: float = 0
-                if len(row) == 5:
-                    weight = float(row[4])
-                
-                # we assuming the symbols is already escaped
-                isymbol = isymbols[isymbol_id]
-                osymbol = osymbols[osymbol_id]
-
-                # add arc to graph
-                while len(fst._graph) <= src_state:
-                    fst._graph.append(dict())
-                if isymbol not in fst._graph[src_state]:
-                    fst._graph[src_state][isymbol] = []
-                fst._graph[src_state][isymbol].append((dest_state, osymbol, weight))
-
-            elif len(row) in {1, 2}:
-                # final state
-                state = int(row[0])
-                weight = 0
-                if len(row) == 2:
-                    weight = float(row[1])
-                fst._final_weights[state] = weight
-
-            else:
-                raise Exception(f'invalid line in fst stream: {line.strip()}')
-
-        return fst
-
     @property
     def isymbol_dict(self) -> dict[str, int]:
         ''' get the input symbol to input symbol id mapping dict '''
@@ -136,30 +65,3 @@ class Fst:
     def get_final_weight(self, state: int) -> float:
         r''' get weights for final state, return NAN if it's not a final state '''
         return self._final_weights.get(state, NAN)
-
-    @staticmethod
-    def _read_symbols(symbol_stream: TextIO) -> list[str]:
-        r'''
-        read symbol list from symbol_stream. the symbol list format is: <symbol> <symbol-id>\n
-        Args:
-            symbol_stream (TextIO): the text stream for symbol list
-        Returns:
-            the list from symbol-id to symbol'''
-
-        symbols: dict[int, str] = {}
-        for line in symbol_stream:
-            row = line.strip().split()
-            if len(row) != 2:
-                raise Exception(f'invalid line in symbol_stream: {line.strip()}')
-            symbol: str = row[0]
-            symbol_id = int(row[1])
-
-            symbols[symbol_id] = symbol
-
-        symbol_list: list[str] = []
-        for symbol_id, sym in symbols.items():
-            while len(symbol_list) <= symbol_id:
-                symbol_list.append(EPS_SYM)
-            symbol_list[symbol_id] = sym
-
-        return symbol_list

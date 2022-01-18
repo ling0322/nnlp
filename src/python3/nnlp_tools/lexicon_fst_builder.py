@@ -1,20 +1,35 @@
 ''' generate FST from lexicon '''
 from __future__ import annotations
-from typing import Optional, Sequence, TYPE_CHECKING, Type, Union
-import math
-import sys
+from typing import Sequence, TYPE_CHECKING
 
-from nnlp.symbol import CAP_EPS_SYM, CAP_SYM, EPS_SYM, UNK_SYM, make_disambig_symbol, unescape_symbol
-from nnlp_tools.fst_writer import FstWriter
+from nnlp.symbol import EPS_SYM, make_disambig_symbol
+from .mutable_fst import MutableFst
 
 if TYPE_CHECKING:
     Lexicon = list[tuple[str, Sequence[str], float]]
 
 
+def build_lexicon_fst(lexicon: Lexicon, name: str = 'L') -> MutableFst:
+    '''
+    Build a FST for input lexicon, returns the MutableFst. it will add disambig
+    symbols automatically
+    Args:
+        lexicon: The input lexicon
+    Returns:
+        the FST for lexicon (after add disambig symbols)
+    '''
+
+    mutable_fst = MutableFst(name=name)
+    fst_builder = LexiconFstBuilder()
+    fst_builder(lexicon, mutable_fst)
+
+    return mutable_fst
+
+
 class LexiconFstBuilder:
     r''' generate FST from lexicon '''
 
-    def __call__(self, lexicon: Lexicon, fst_writer: FstWriter) -> Lexicon:
+    def __call__(self, lexicon: Lexicon, mutable_fst: MutableFst) -> Lexicon:
         ''' 
         build FST from lexicon, and write the FST to file using fst_writer
         Args:
@@ -26,16 +41,22 @@ class LexiconFstBuilder:
         disambig_lexicon = self._add_disambig(lexicon)
         for word, symbols, weight in disambig_lexicon:
             state = 0
+            if not word or not symbols:
+                raise Exception(
+                    f'invalid lexicon entry: {(word, symbols, weight)}')
+
             for idx, symbol in enumerate(symbols):
                 # back to state 0 if ch is the last char in word
                 arc_weight = weight if idx == 0 else 0
-                next_state = 0 if idx == len(symbols) - 1 else fst_writer.create_state()
+                next_state = 0 if idx == len(
+                    symbols) - 1 else mutable_fst.create_state()
                 osymbol: str = word if idx == 0 else EPS_SYM
 
-                fst_writer.add_arc(state, next_state, symbol, osymbol, arc_weight)
+                mutable_fst.add_arc(state, next_state, symbol, osymbol,
+                                    arc_weight)
                 state = next_state
 
-        fst_writer.set_final_state(0)
+        mutable_fst.set_final_state(0)
 
         return disambig_lexicon
 
