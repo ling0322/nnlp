@@ -6,7 +6,7 @@ import sys
 import argparse
 
 from nnlp.symbol import CAP_SYM, EPS_SYM, BRK_SYM, UNK_SYM, is_special_symbol
-from nnlp_tools.fst_writer import FstWriter
+from nnlp_tools.mutable_fst import FstWriter
 from nnlp_tools.util import read_symbol_table
 
 parser = argparse.ArgumentParser(prog="build_break_outputter_fst.py")

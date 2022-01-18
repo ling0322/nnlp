@@ -6,9 +6,9 @@ from nnlp_tools.grammar import Grammar
 from nnlp_tools.rule_parser import RuleParser
 from nnlp_tools.grammar_fst_builder import GrammarFstBuilder
 from nnlp_tools.util import SourcePosition
-from nnlp_tools.fst_writer import FstWriter
+from nnlp_tools.mutable_fst import MutableFst
 
-from .util import trim_text
+from .util import norm_textfst
 
 
 class TestFSTGenerator(unittest.TestCase):
@@ -24,19 +24,16 @@ class TestFSTGenerator(unittest.TestCase):
         rules = parser(*tokenizer('<root> ::= ("hi")* '), SourcePosition())
         grammar = Grammar(rules, "root")
 
-        f_fst = io.StringIO()
-        f_isym = io.StringIO()
-        f_osym = io.StringIO()
+        mutable_fst = MutableFst()
+        fst_builder(grammar, mutable_fst)
 
-        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
-            fst_builder(grammar, fst_writer)
+        t = '''
+            0 2 <eps> <eps>
+            1
+            2 3 h h
+            2 1 <eps> <eps>
+            3 4 i i
+            4 2 <eps> <eps>
+            '''
+        self.assertEqual(norm_textfst(t), norm_textfst(mutable_fst.to_text()))
 
-        self.assertEqual(
-            f_fst.getvalue(),
-            trim_text("""0 2 0 0 0.0
-                2 3 1 1 0.0
-                3 4 2 2 0.0
-                4 2 0 0 0.0
-                2 1 0 0 0.0
-                1 0.0
-                """))

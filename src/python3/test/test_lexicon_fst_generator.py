@@ -4,9 +4,9 @@ import math
 import io
 
 from nnlp_tools.lexicon_fst_builder import LexiconFstBuilder
-from nnlp_tools.fst_writer import FstWriter
+from nnlp_tools.mutable_fst import MutableFst
 
-from .util import trim_text
+from .util import norm_textfst
 
 
 class TestLexiconFstBuilder(unittest.TestCase):
@@ -17,25 +17,21 @@ class TestLexiconFstBuilder(unittest.TestCase):
 
         fst_builder = LexiconFstBuilder()
 
-        f_fst = io.StringIO()
-        f_isym = io.StringIO()
-        f_osym = io.StringIO()
+        mutable_fst = MutableFst()
+        fst_builder([('hi', ('h', 'i'), -0.69),
+                     ('hello', ('h', 'e', 'l', 'l', 'o'), -0.36)], mutable_fst)
+        t = '''
+            0 1 h hi -0.69
+            0 2 h hello -0.36
+            0
+            1 0 i <eps>
+            2 3 e <eps>
+            3 4 l <eps>
+            4 5 l <eps>
+            5 0 o <eps>
+            '''
 
-        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
-            fst_builder([('hi', ('h', 'i'), -0.69), ('hello', ('h', 'e', 'l', 'l', 'o'), -0.36)],
-                        fst_writer)
-
-        self.assertEqual(
-            f_fst.getvalue(),
-            trim_text("""0 1 1 1 -0.69
-                1 0 2 0 0
-                0 2 1 2 -0.36
-                2 3 3 0 0
-                3 4 4 0 0
-                4 5 4 0 0
-                5 0 5 0 0
-                0 0.0
-                """))
+        self.assertEqual(norm_textfst(t), norm_textfst(mutable_fst.to_text()))
 
     def test_add_disambig(self):
         r''' test the LexiconFstBuilder '''
@@ -50,24 +46,21 @@ class TestLexiconFstBuilder(unittest.TestCase):
             ('bar', ('f', 'o', 'o', '#2'), -0.36),
         ])
 
-        f_fst = io.StringIO()
-        f_isym = io.StringIO()
-        f_osym = io.StringIO()
+        mutable_fst = MutableFst()
+        fst_builder(lexicon, mutable_fst)
+        t = '''
+            0 1 f fo -0.69
+            0 3 f foo -0.36
+            0 6 f bar -0.36
+            0
+            1 2 o <eps>
+            2 0 #1 <eps>
+            3 4 o <eps>
+            4 5 o <eps>
+            5 0 #1 <eps>
+            6 7 o <eps>
+            7 8 o <eps>
+            8 0 #2 <eps>
+            '''
 
-        with FstWriter(f_fst, f_isym, f_osym) as fst_writer:
-            fst_builder(lexicon, fst_writer)
-        self.assertEqual(
-            f_fst.getvalue(),
-            trim_text("""0 1 1 1 -0.69
-                1 2 2 0 0
-                2 0 3 0 0
-                0 3 1 2 -0.36
-                3 4 2 0 0
-                4 5 2 0 0
-                5 0 3 0 0
-                0 6 1 3 -0.36
-                6 7 2 0 0
-                7 8 2 0 0
-                8 0 4 0 0
-                0 0.0
-                """))
+        self.assertEqual(norm_textfst(t), norm_textfst(mutable_fst.to_text()))
