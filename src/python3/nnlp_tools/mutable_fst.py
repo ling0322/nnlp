@@ -52,8 +52,6 @@ class MutableFst:
         ''' set final state with weight '''
         self._fst.set_final(state, weight)
 
-    
-
     def print_info(self) -> None:
         ''' print information of FST to stdout '''
         num_iepsilons = 0
@@ -71,6 +69,7 @@ class MutableFst:
 
         print(f'fstinfo: {self.name}')
         print(f'# of states: {self._fst.num_states()}')
+        print(f'# of final states: {len(self.final_states())}')
         print(f'# of arcs: {num_arcs}')
         print(f'# of epsilons: {num_epsilons}')
         print(f'# of input epsilons: {num_iepsilons}')
@@ -202,6 +201,17 @@ class MutableFst:
         fst._fst = self._fst.minimize(allow_nondet=allow_nondet)
 
         return fst
+
+    def compose(self, fst: MutableFst) -> MutableFst:
+        ''' composes two FSTs, returns (self o fst) '''
+        if not self._osymbols is fst._isymbols:
+            raise Exception('FST compose: in-/output symbols table mismatch')
+        composed_fst = MutableFst(name=f'{self.name} o {fst.name}')
+        composed_fst._isymbols = self._isymbols.copy()
+        composed_fst._osymbols = fst._osymbols.copy()
+        composed_fst._fst = pywrapfst.compose(self._fst, fst._fst)
+
+        return composed_fst
 
     def to_json(self) -> str:
         '''
