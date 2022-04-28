@@ -1,0 +1,9 @@
+go 1.18
+
+use ./src/go/nmutfst
+use ./src/go/capi
+use ./src/go/errors
+use ./src/go/nnlp
+use ./src/go/nregex
+use ./src/go/nfst
+
