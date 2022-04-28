@@ -6,3 +6,4 @@ target
 egs/**/exp/
 openfst-*
 build/
+openfst
