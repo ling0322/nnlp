@@ -1,6 +1,8 @@
 package nregex
 
 import (
+	"fmt"
+
 	"github.com/ling0322/nnlp/src/go/nmutfst"
 )
 
@@ -9,6 +11,7 @@ type MutFst = nmutfst.MutableFst
 // error messages
 const (
 	errUnexpectedEOL    = "unexpected end of expression"
+	errUnexpectedEOF    = "unexpected end of file"
 	errUnexpectedChar   = "unexpected token"
 	errEmptyExpr        = "expression is empty"
 	errInvalidClosere   = "invalid closure expression"
@@ -17,6 +20,12 @@ const (
 	errRangeOutOfOrder  = "range out of order"
 	errRefClassNotExist = "reference class <%s> not exist"
 )
+
+const NoValue = -1
+
+func SyntaxError(message string, r *reader) error {
+	return fmt.Errorf("%s:%d:%d %s", r.filename, r.ln, r.offset, message)
+}
 
 // listStringToSymbol converts list of strings to list of symbols
 //lint:ignore U1000 For future use

@@ -34,7 +34,7 @@ type RangeExpr struct {
 // Stores the state of reading bracket range expression
 type bracketStateMachine struct {
 	token        rune
-	cursor       *cursor
+	reader       *reader
 	expr         *RangeExpr
 	state        int
 	complemented bool
@@ -42,32 +42,32 @@ type bracketStateMachine struct {
 }
 
 // readEscapedRange reads an escaped range expression
-func readEscapedRange(c *cursor) (*RangeExpr, error) {
-	ch := c.value()
+func readEscapedRange(r *reader) (*RangeExpr, error) {
+	ch := r.Rune()
 	if ch != '\\' {
 		panic(errUnexpectedChar)
 	}
-	c.next()
-	if c.finished() {
-		return nil, SyntaxError(errUnexpectedEOL, c.offset)
+	r.NextRune()
+	if r.EOL() {
+		return nil, SyntaxError(errUnexpectedEOL, r)
 	}
 
-	ch = c.value()
+	ch = r.Rune()
 	if ch == 's' {
-		c.next()
+		r.NextRune()
 		return &RangeExpr{charset(" \t\r\n"), nil}, nil
 	} else if ch == 'w' {
-		c.next()
+		r.NextRune()
 		return &RangeExpr{
 			Charset: charset("_"),
 			Ranges:  []Range{{'A', 'Z'}, {'a', 'z'}, {'0', '9'}}}, nil
 	} else if ch == 'd' {
-		c.next()
+		r.NextRune()
 		return &RangeExpr{
 			Charset: nil,
 			Ranges:  []Range{{'0', '9'}}}, nil
 	} else {
-		return nil, SyntaxError(errUnexpectedChar, c.offset)
+		return nil, SyntaxError(errUnexpectedChar, r)
 	}
 }
 
@@ -75,9 +75,9 @@ func readEscapedRange(c *cursor) (*RangeExpr, error) {
 // do nothing
 func (s *bracketStateMachine) onBegin0() {
 	// in this state, it will consumes char - only
-	if s.cursor.value() == '^' {
+	if s.reader.Rune() == '^' {
 		s.complemented = true
-		s.cursor.next()
+		s.reader.Rune()
 	}
 	s.state = kBeginState
 }
@@ -86,9 +86,9 @@ func (s *bracketStateMachine) onBegin0() {
 // do nothing
 func (s *bracketStateMachine) onBegin() {
 	// in this state, it will consumes char - only
-	if s.cursor.value() == '-' {
+	if s.reader.Rune() == '-' {
 		s.expr.Charset['-'] = true
-		s.cursor.next()
+		s.reader.NextRune()
 	}
 	s.state = kDefaultState
 }
@@ -97,21 +97,21 @@ func (s *bracketStateMachine) onBegin() {
 // switch to kRangeState if '-' found after one token
 // switch to kEndState if ']' found
 func (s *bracketStateMachine) onDefault() {
-	if s.cursor.value() == ']' {
-		s.cursor.next()
+	if s.reader.Rune() == ']' {
+		s.reader.NextRune()
 		s.state = kEndState
 		return
 	}
 
-	if s.token, s.err = readRune(s.cursor); s.err != nil {
+	if s.token, s.err = readRune(s.reader); s.err != nil {
 		return
 	}
-	if s.cursor.finished() {
-		s.err = SyntaxError(errUnexpectedEOL, s.cursor.offset)
+	if s.reader.EOL() {
+		s.err = SyntaxError(errUnexpectedEOL, s.reader)
 	}
-	if s.cursor.value() == '-' {
+	if s.reader.Rune() == '-' {
 		s.state = kRangeState
-		s.cursor.next()
+		s.reader.NextRune()
 	} else {
 		s.expr.Charset[s.token] = true
 	}
@@ -120,22 +120,23 @@ func (s *bracketStateMachine) onDefault() {
 // onRange reads the another token of range expression from cursor and add the
 // range into expr
 func (s *bracketStateMachine) onRange() {
-	dashOffset := s.cursor.offset - 1
-	if s.token == noValue {
+	dashOffset := s.reader.Position() - 1
+	if s.token == NoValue {
 		panic(errInternalErr)
 	}
-	if s.cursor.value() == ']' {
-		s.err = SyntaxError(errUnexpectedChar, s.cursor.offset)
+	if s.reader.Rune() == ']' {
+		s.err = SyntaxError(errUnexpectedChar, s.reader)
 		return
 	}
 
 	var token rune
-	token, s.err = readRune(s.cursor)
+	token, s.err = readRune(s.reader)
 	if s.err != nil {
 		return
 	}
 	if s.token > token {
-		s.err = SyntaxError(errRangeOutOfOrder, dashOffset)
+		s.reader.SetPosition(dashOffset)
+		s.err = SyntaxError(errRangeOutOfOrder, s.reader)
 		return
 	}
 
@@ -145,7 +146,7 @@ func (s *bracketStateMachine) onRange() {
 
 // process the reader using state machine
 func (s *bracketStateMachine) process() {
-	for !s.cursor.finished() {
+	for !s.reader.EOL() {
 		if s.state == kBeginState0 {
 			s.onBegin0()
 		} else if s.state == kBeginState {
@@ -200,18 +201,18 @@ func getComplementRange(expr *RangeExpr) (complExpr *RangeExpr) {
 }
 
 // readBracketRange reads a square bracket range expression
-func readBracketRange(c *cursor) (*RangeExpr, error) {
-	beginOffset := c.offset
-	ch := c.value()
+func readBracketRange(r *reader) (*RangeExpr, error) {
+	beginOffset := r.Position()
+	ch := r.Rune()
 	if ch != '[' {
-		return nil, SyntaxError(errUnexpectedChar, c.offset)
+		return nil, SyntaxError(errUnexpectedChar, r)
 	}
-	c.next()
+	r.NextRune()
 
 	expr := &RangeExpr{map[rune]bool{}, []Range{}}
 	fsm := &bracketStateMachine{
-		token:        noValue,
-		cursor:       c,
+		token:        NoValue,
+		reader:       r,
 		expr:         expr,
 		state:        kBeginState0,
 		complemented: false,
@@ -224,7 +225,8 @@ func readBracketRange(c *cursor) (*RangeExpr, error) {
 	}
 
 	if len(expr.Charset) == 0 && len(expr.Ranges) == 0 {
-		return nil, SyntaxError(errEmptyExpr, beginOffset)
+		r.SetPosition(beginOffset)
+		return nil, SyntaxError(errEmptyExpr, r)
 	}
 
 	if fsm.complemented {
@@ -234,18 +236,18 @@ func readBracketRange(c *cursor) (*RangeExpr, error) {
 }
 
 // readRange reads a range expression from cursor
-func readRange(c *cursor) (*RangeExpr, error) {
-	if c.finished() {
-		return nil, SyntaxError(errUnexpectedEOL, c.offset)
+func readRange(r *reader) (*RangeExpr, error) {
+	if r.EOL() {
+		return nil, SyntaxError(errUnexpectedEOL, r)
 	}
 
-	ch := c.expr[c.offset]
+	ch := r.Rune()
 	if ch == '\\' {
-		return readEscapedRange(c)
+		return readEscapedRange(r)
 	} else if ch == '[' {
-		return readBracketRange(c)
+		return readBracketRange(r)
 	} else {
-		return nil, SyntaxError(errUnexpectedChar, c.offset)
+		return nil, SyntaxError(errUnexpectedChar, r)
 	}
 }
 

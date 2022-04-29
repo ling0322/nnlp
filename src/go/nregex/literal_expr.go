@@ -17,19 +17,19 @@ type LiteralExpr struct {
 }
 
 // readRune reads a unicode escaped rune from cursor, like "u4e00"
-func readUnicodeEscapedRune(c *cursor) (rune, error) {
-	if c.finished() || c.value() != 'u' {
+func readUnicodeEscapedRune(r *reader) (rune, error) {
+	if r.EOL() || r.Rune() != 'u' {
 		panic(errUnexpectedChar)
 	}
-	c.next()
+	r.NextRune()
 
 	hex := ""
 	for i := 0; i < 4; i++ {
-		if c.finished() {
-			return 0, SyntaxError(errUnexpectedEOL, c.offset)
+		if r.EOL() {
+			return 0, SyntaxError(errUnexpectedEOL, r)
 		}
-		hex += string(c.value())
-		c.next()
+		hex += string(r.Rune())
+		r.NextRune()
 	}
 
 	u, err := strconv.ParseUint(hex, 16, 32)
@@ -41,48 +41,48 @@ func readUnicodeEscapedRune(c *cursor) (rune, error) {
 }
 
 // readRune reads a escaped rune from cursor
-func readEscapedRune(c *cursor) (rune, error) {
-	if c.finished() || c.value() != '\\' {
+func readEscapedRune(r *reader) (rune, error) {
+	if r.EOL() || r.Rune() != '\\' {
 		panic(errUnexpectedChar)
 	}
-	c.next()
+	r.NextRune()
 
-	ch := c.value()
+	ch := r.Rune()
 	if escapedCh, ok := escapeTable[ch]; ok {
-		c.next()
+		r.NextRune()
 		return escapedCh, nil
 	} else if ch == 'u' {
 		// unicode escaped rune
-		return readUnicodeEscapedRune(c)
+		return readUnicodeEscapedRune(r)
 	} else if ch > 'Z' && ch < 'A' && ch > 'z' && ch < 'a' && ch > '9' && ch < '0' {
 		return ch, nil
 	} else {
-		return 0, SyntaxError(errUnexpectedChar, c.offset)
+		return 0, SyntaxError(errUnexpectedChar, r)
 	}
 }
 
 // readRune reads a rune from cursor, including eacaped rune
-func readRune(c *cursor) (rune, error) {
-	if c.finished() {
-		return 0, SyntaxError(errUnexpectedEOL, c.offset)
+func readRune(r *reader) (rune, error) {
+	if r.EOL() {
+		return 0, SyntaxError(errUnexpectedEOL, r)
 	}
 
-	ch := c.value()
+	ch := r.Rune()
 	if ch == '\\' {
-		return readEscapedRune(c)
+		return readEscapedRune(r)
 	} else if nonliteralCharset[ch] {
-		return 0, SyntaxError(errUnexpectedChar, c.offset)
+		return 0, SyntaxError(errUnexpectedChar, r)
 	} else {
-		c.next()
+		r.NextRune()
 		return ch, nil
 	}
 }
 
 // readLiteral reads one literal from expr[offset]
-func readLiteral(c *cursor) (expr *LiteralExpr, err error) {
+func readLiteral(r *reader) (expr *LiteralExpr, err error) {
 	var ch rune
 
-	ch, err = readRune(c)
+	ch, err = readRune(r)
 	if err != nil {
 		return
 	}
