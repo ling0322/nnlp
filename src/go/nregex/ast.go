@@ -3,7 +3,7 @@ package nregex
 // Abstract syntax tree for n-regex
 type AST interface {
 	// Checks if this node and its child nodes are correct
-	// mainly check 2 thing
+	// mainly check 2 things
 	//   cycle reference (regular grammar didn't supoort it)
 	//   reference class not exist
 	// refStack is the stack of reference class to this node

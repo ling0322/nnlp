@@ -47,12 +47,12 @@ func checkMinMax(min, max int, err error) error {
 
 // readRangeClosure reads a range closure from cursor. token will be placed into
 // the ClosureExpr
-func readRangeClosure(c *cursor, token AST) (*ClosureExpr, error) {
-	if c.finished() || c.expr[c.offset] != '{' {
+func readRangeClosure(r *reader, token AST) (*ClosureExpr, error) {
+	if r.EOL() || r.Rune() != '{' {
 		panic(errUnexpectedChar)
 	}
 
-	s := string(c.expr[c.offset:])
+	s := string(r.expr[r.offset:])
 	var m, n, expr string
 	if match := regexpClosureMN.FindStringSubmatch(s); match != nil {
 		m = match[1]
@@ -67,46 +67,46 @@ func readRangeClosure(c *cursor, token AST) (*ClosureExpr, error) {
 		n = match[1]
 		expr = match[0]
 	} else {
-		return nil, SyntaxError(errInvalidClosere, c.offset)
+		return nil, SyntaxError(errInvalidClosere, r)
 	}
 
 	min, err := atoi(m, nil)
 	max, err := atoi(n, err)
 	err = checkMinMax(min, max, err)
 	if err != nil {
-		return nil, SyntaxError(errInvalidClosere, c.offset)
+		return nil, SyntaxError(errInvalidClosere, r)
 	}
 
-	c.offset += utf8.RuneCountInString(expr)
+	r.MoveForward(utf8.RuneCountInString(expr))
 	return &ClosureExpr{min, max, token}, nil
 }
 
-// readClosure reads a closure expression from cursor. It will take the last
+// readClosure reads a closure expression from reader. It will take the last
 // element as token in ClosureExpr
-func readClosure(c *cursor, expr []AST) (*ClosureExpr, error) {
-	if c.finished() {
-		return nil, SyntaxError(errUnexpectedEOL, c.offset)
+func readClosure(r *reader, expr []AST) (*ClosureExpr, error) {
+	if r.EOL() {
+		return nil, SyntaxError(errUnexpectedEOL, r)
 	}
 	if expr == nil {
-		return nil, SyntaxError(errInvalidClosere, c.offset)
+		return nil, SyntaxError(errInvalidClosere, r)
 	}
 
 	token := expr[len(expr)-1]
 
-	ch := c.expr[c.offset]
+	ch := r.Rune()
 	if ch == '*' {
-		c.offset++
+		r.offset++
 		return &ClosureExpr{0, -1, token}, nil
 	} else if ch == '+' {
-		c.offset++
+		r.offset++
 		return &ClosureExpr{1, -1, token}, nil
 	} else if ch == '?' {
-		c.offset++
+		r.offset++
 		return &ClosureExpr{0, 1, token}, nil
 	} else if ch == '{' {
-		return readRangeClosure(c, token)
+		return readRangeClosure(r, token)
 	} else {
-		return nil, SyntaxError(errInvalidClosere, c.offset)
+		return nil, SyntaxError(errInvalidClosere, r)
 	}
 }
 

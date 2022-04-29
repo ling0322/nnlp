@@ -13,36 +13,36 @@ type ParallelExpr struct {
 }
 
 // readParallel reads a parallel expression from expr[offset]
-func readParallel(c *cursor) (exprAst AST, err error) {
+func readParallel(r *reader) (exprAst AST, err error) {
 	parallelAsts := []AST{}
-	ch := c.expr[c.offset]
+	ch := r.Rune()
 	if ch != '(' {
-		err = SyntaxError(errUnexpectedChar, c.offset)
+		err = SyntaxError(errUnexpectedChar, r)
 		return
 	}
 
-	c.offset++
+	r.NextRune()
 	var ast AST
 	endChars := map[rune]bool{')': true, '|': true}
 	for {
-		ast, err = parseExpr(c, endChars)
+		ast, err = readExpr(r, endChars)
 		if err != nil {
 			return
 		}
 
-		if c.finished() || !endChars[c.expr[c.offset]] {
-			err = SyntaxError(errUnexpectedEOL, c.offset)
+		if r.EOL() || !endChars[r.Rune()] {
+			err = SyntaxError(errUnexpectedEOL, r)
 			return
 		}
 
 		parallelAsts = append(parallelAsts, ast)
-		if c.expr[c.offset] == ')' {
-			c.offset++
+		if r.Rune() == ')' {
+			r.NextRune()
 			break
-		} else if c.expr[c.offset] == '|' {
-			c.offset++
+		} else if r.Rune() == '|' {
+			r.NextRune()
 		} else {
-			err = SyntaxError("')' or '|' expected", c.offset)
+			err = SyntaxError(errUnexpectedChar, r)
 			return
 		}
 	}
@@ -54,7 +54,7 @@ func readParallel(c *cursor) (exprAst AST, err error) {
 	}
 
 	if len(parallelAsts) == 0 {
-		err = SyntaxError(errEmptyExpr, c.offset)
+		err = SyntaxError(errEmptyExpr, r)
 	} else if len(parallelAsts) == 1 {
 		exprAst = parallelAsts[0]
 	} else {

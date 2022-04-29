@@ -168,3 +168,19 @@ func TestRangeExpr(t *testing.T) {
 	decoder := nnlp.NewDecoder(fst, 8)
 	assertDecode(t, decoder, "hi abc123cbaaabbcc002233", "hi abc123cbaaabbcc002233")
 }
+
+var multiLineExpr = `
+<city> ::= ( 
+	bellevue
+	redmond
+	seattle
+)
+<weather> ::= weather in <city>
+`
+
+func TestMultiLineExpr(t *testing.T) {
+	fst := assertBuildFst(t, multiLineExpr, "weather")
+	decoder := nnlp.NewDecoder(fst, 8)
+	assertDecode(t, decoder, "weather in bellevue", "weather in bellevue")
+	assertDecode(t, decoder, "weather in seattle", "weather in seattle")
+}

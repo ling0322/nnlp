@@ -12,34 +12,44 @@ type RefExpr struct {
 	Name string
 }
 
-// readRef reads a reference expression from cursor
-func readRef(c *cursor) (e *RefExpr, err error) {
-	if c.finished() {
-		err = SyntaxError(errUnexpectedEOL, c.offset)
+// readRefToken reads a reference token <name> from cursor
+func readRefToken(r *reader) (name string, err error) {
+	if r.EOL() {
+		err = SyntaxError(errUnexpectedEOL, r)
 		return
-	} else if c.expr[c.offset] != '<' {
-		err = SyntaxError(errUnexpectedChar, c.offset)
+	} else if r.Rune() != '<' {
+		err = SyntaxError(errUnexpectedChar, r)
 		return
 	}
 
-	name := ""
-	c.offset++
+	name = ""
+	r.NextRune()
 	for {
-		if c.finished() {
-			err = SyntaxError(errUnexpectedEOL, c.offset)
+		if r.EOL() {
+			err = SyntaxError(errUnexpectedEOL, r)
 			return
 		}
-		ch := c.expr[c.offset]
+		ch := r.Rune()
 		if ch == '>' {
-			c.offset++
+			r.NextRune()
 			break
 		} else if invalidCharset[ch] {
 			log.Fatalln(ch)
-			err = SyntaxError(errUnexpectedChar, c.offset)
+			err = SyntaxError(errUnexpectedChar, r)
 			return
 		}
 		name += string(ch)
-		c.offset++
+		r.NextRune()
+	}
+
+	return
+}
+
+// readRef reads a reference expression from cursor
+func readRef(r *reader) (e *RefExpr, err error) {
+	name, err := readRefToken(r)
+	if err != nil {
+		return
 	}
 
 	e = &RefExpr{
