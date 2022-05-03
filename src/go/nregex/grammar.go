@@ -2,7 +2,6 @@ package nregex
 
 import (
 	"fmt"
-	"unicode"
 
 	"github.com/ling0322/nnlp/src/go/nfst"
 	"github.com/ling0322/nnlp/src/go/nmutfst"
@@ -10,58 +9,21 @@ import (
 
 // grammar is a collection of n-regex rules with its class name
 type Grammar struct {
-	rules map[string]AST
+	rules    map[string]AST
+	captures map[string]bool
 }
 
 func GrammarError(message string, refStack []string) error {
 	return fmt.Errorf("GrammarError: %s at class <%s>", message, refStack[len(refStack)-1])
 }
 
-// readSpaces reads spaces from reader, return error if EOL reached
-func readSpaces(r *reader, err error) error {
-	if err != nil {
-		return err
-	}
-
-	for (!r.EOL()) && unicode.IsSpace(r.Rune()) {
-		r.NextRune()
-	}
-	if r.EOL() {
-		return SyntaxError(errUnexpectedEOL, r)
-	}
-
-	return nil
-}
-
-// readStringN reads a string of n runes from reade
-func readStringN(r *reader, n int) (s string, err error) {
-	for i := 0; i < n; i++ {
-		if r.EOL() {
-			return "", SyntaxError(errUnexpectedEOL, r)
-		}
-		s += string(r.Rune())
-		r.NextRune()
-	}
-
-	return s, nil
-}
-
 // readDefLeft reads left part of the define statement, including ::=
 func (g *Grammar) readDefLeft(r *reader) (name string, err error) {
 	name, err = readRefToken(r)
 	err = readSpaces(r, err)
+	err = readAndCheckString(r, "::=", err)
 	if err != nil {
 		return
-	}
-
-	beginOffset := r.Position()
-	s, err := readStringN(r, 3)
-	if err != nil {
-		return
-	}
-	if s != "::=" {
-		r.SetPosition(beginOffset)
-		return "", SyntaxError(errUnexpectedChar, r)
 	}
 
 	return
@@ -156,16 +118,62 @@ func (g *Grammar) readDef(r *reader) error {
 	return nil
 }
 
+// readCaptures reads the capture list ($captures = <name1> <name2> ...) from
+// grammar file
+func (g *Grammar) readCaptures(r *reader) error {
+	for !r.EOL() {
+		name, err := readRefToken(r)
+		err = readSpaces(r, err)
+		if err != nil {
+			return err
+		}
+		g.captures[name] = true
+	}
+
+	return nil
+}
+
+// readArgs read arguments from grammar file
+func (g *Grammar) readArgs(r *reader) error {
+	beginPos := r.Position()
+	err := readAndCheckString(r, "$", nil)
+	name, err := readName(r, charset(" ="), err)
+	err = readSpaces(r, err)
+	err = readAndCheckString(r, "=", err)
+	err = readSpaces(r, err)
+	if err != nil {
+		return err
+	}
+
+	if name == "capture" {
+		err = g.readCaptures(r)
+	} else {
+		r.SetPosition(beginPos)
+		err = SyntaxError(errUnexpectedArgName, r)
+	}
+
+	return err
+}
+
 // read reads and parse the grammar from grammar reader. entry of the grammar
 // parsing methods
 func (g *Grammar) read(r *reader) error {
+	var err error
 	for r.Scan() {
 		if r.EOL() {
 			// empty line
 			continue
 		}
 
-		g.readDef(r)
+		ch := r.Rune()
+		if ch == '$' {
+			err = g.readArgs(r)
+		} else {
+			err = g.readDef(r)
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	if r.Err() != nil {
@@ -200,7 +208,8 @@ func (g *Grammar) BuildFst(name string) (fst *nfst.Fst, err error) {
 func FromString(expr string) (grammar *Grammar, err error) {
 	reader := newStringReader(expr, readerOptions{TrimSpace: true})
 	grammar = &Grammar{
-		rules: map[string]AST{},
+		rules:    map[string]AST{},
+		captures: map[string]bool{},
 	}
 
 	if err = grammar.read(reader); err != nil {

@@ -2,6 +2,7 @@ package nregex
 
 import (
 	"fmt"
+	"unicode"
 
 	"github.com/ling0322/nnlp/src/go/nmutfst"
 )
@@ -10,16 +11,19 @@ type MutFst = nmutfst.MutableFst
 
 // error messages
 const (
-	errUnexpectedEOL    = "unexpected end of expression"
-	errUnexpectedEOF    = "unexpected end of file"
-	errUnexpectedChar   = "unexpected token"
-	errEmptyExpr        = "expression is empty"
-	errInvalidClosere   = "invalid closure expression"
-	errInternalErr      = "internal error"
-	errInvalidState     = "invalid state"
-	errRangeOutOfOrder  = "range out of order"
-	errRefClassNotExist = "reference class <%s> not exist"
+	errUnexpectedEOL     = "unexpected end of expression"
+	errUnexpectedEOF     = "unexpected end of file"
+	errUnexpectedChar    = "unexpected token"
+	errUnexpectedArgName = "unexpected argument name"
+	errEmptyExpr         = "expression is empty"
+	errInvalidClosere    = "invalid closure expression"
+	errInternalErr       = "internal error"
+	errInvalidState      = "invalid state"
+	errRangeOutOfOrder   = "range out of order"
+	errRefClassNotExist  = "reference class <%s> not exist"
 )
+
+var invalidCharset = charset(" \t\r\n<>?*+()[]{}|^$:;,\\~!@#$%&-=`\"'/")
 
 const NoValue = -1
 
@@ -118,4 +122,67 @@ func buildLiteralFst(input, output rune, fst *MutFst, state int) int {
 	})
 
 	return nextState
+}
+
+// readSpaces reads spaces from reader
+func readSpaces(r *reader, err error) error {
+	if err != nil {
+		return err
+	}
+
+	for (!r.EOL()) && unicode.IsSpace(r.Rune()) {
+		r.NextRune()
+	}
+
+	return nil
+}
+
+// readAndCheckString reads a string of len(check) runes from reader, then check
+// if it equals to s. return err if not matched
+func readAndCheckString(r *reader, check string, err error) error {
+	if err != nil {
+		return err
+	}
+
+	beginOffset := r.Position()
+
+	s := ""
+	for i := 0; i < len(check); i++ {
+		if r.EOL() {
+			return SyntaxError(errUnexpectedEOL, r)
+		}
+		s += string(r.Rune())
+		r.NextRune()
+	}
+
+	if s != check {
+		r.SetPosition(beginOffset)
+		return SyntaxError(errUnexpectedChar, r)
+	}
+
+	return nil
+}
+
+// readName reads a name string from reader until specific chars occured
+func readName(r *reader, until map[rune]bool, err error) (string, error) {
+	if err != nil {
+		return "", err
+	}
+
+	name := ""
+	for {
+		if r.EOL() {
+			return "", SyntaxError(errUnexpectedEOL, r)
+		}
+		ch := r.Rune()
+		if until[ch] {
+			break
+		} else if invalidCharset[ch] {
+			return "", SyntaxError(errUnexpectedChar, r)
+		}
+		name += string(ch)
+		r.NextRune()
+	}
+
+	return name, nil
 }

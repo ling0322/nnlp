@@ -2,10 +2,9 @@ package nregex
 
 import (
 	"fmt"
-	"log"
-)
 
-var invalidCharset = charset("<>?*+()[]{}|^$:;,\\~!@#$%&-=`\"'/")
+	"github.com/ling0322/nnlp/src/go/nmutfst"
+)
 
 // A reference expression
 type RefExpr struct {
@@ -14,33 +13,9 @@ type RefExpr struct {
 
 // readRefToken reads a reference token <name> from cursor
 func readRefToken(r *reader) (name string, err error) {
-	if r.EOL() {
-		err = SyntaxError(errUnexpectedEOL, r)
-		return
-	} else if r.Rune() != '<' {
-		err = SyntaxError(errUnexpectedChar, r)
-		return
-	}
-
-	name = ""
-	r.NextRune()
-	for {
-		if r.EOL() {
-			err = SyntaxError(errUnexpectedEOL, r)
-			return
-		}
-		ch := r.Rune()
-		if ch == '>' {
-			r.NextRune()
-			break
-		} else if invalidCharset[ch] {
-			log.Fatalln(ch)
-			err = SyntaxError(errUnexpectedChar, r)
-			return
-		}
-		name += string(ch)
-		r.NextRune()
-	}
+	err = readAndCheckString(r, "<", nil)
+	name, err = readName(r, charset(">"), err)
+	err = readAndCheckString(r, ">", err)
 
 	return
 }
@@ -58,6 +33,22 @@ func readRef(r *reader) (e *RefExpr, err error) {
 	return
 }
 
+// tagStartSymbol returns the start-tag symbol from name
+func tagStartSymbol(name string) nmutfst.Symbol {
+	if len(name) == 0 {
+		panic(errUnexpectedArgName)
+	}
+	return nmutfst.NewSymbol(fmt.Sprintf("<%s>", name))
+}
+
+// tagEndSymbol returns the end-tag symbol from name
+func tagEndSymbol(name string) nmutfst.Symbol {
+	if len(name) == 0 {
+		panic(errUnexpectedArgName)
+	}
+	return nmutfst.NewSymbol(fmt.Sprintf("</%s>", name))
+}
+
 // AddToFst adds the reference expression to FST
 func (e *RefExpr) AddToFst(g *Grammar, fst *MutFst, state int) int {
 	ast, ok := g.rules[e.Name]
@@ -66,7 +57,31 @@ func (e *RefExpr) AddToFst(g *Grammar, fst *MutFst, state int) int {
 		panic(fmt.Sprintf(errRefClassNotExist, e.Name))
 	}
 
-	return ast.AddToFst(g, fst, state)
+	// we need to emit the tag symbols for capture items
+	if g.captures[e.Name] {
+		nextState := fst.AddState()
+		fst.AddArc(state, nmutfst.Arc{
+			NextState:    nextState,
+			InputSymbol:  nmutfst.EpsilonSym,
+			OutputSymbol: tagStartSymbol(e.Name),
+		})
+		state = nextState
+	}
+
+	state = ast.AddToFst(g, fst, state)
+
+	// we need to emit the tag symbols for capture items
+	if g.captures[e.Name] {
+		nextState := fst.AddState()
+		fst.AddArc(state, nmutfst.Arc{
+			NextState:    nextState,
+			InputSymbol:  nmutfst.EpsilonSym,
+			OutputSymbol: tagEndSymbol(e.Name),
+		})
+		state = nextState
+	}
+
+	return state
 }
 
 func (e *RefExpr) Check(g *Grammar, refStack []string) (err error) {

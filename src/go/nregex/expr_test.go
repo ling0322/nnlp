@@ -184,3 +184,19 @@ func TestMultiLineExpr(t *testing.T) {
 	assertDecode(t, decoder, "weather in bellevue", "weather in bellevue")
 	assertDecode(t, decoder, "weather in seattle", "weather in seattle")
 }
+
+var captureExpr = `
+$capture = <city>
+<city> ::= ( 
+	bellevue
+	redmond
+	seattle
+)
+<weather> ::= weather in <city>
+`
+
+func TestCapture(t *testing.T) {
+	fst := assertBuildFst(t, captureExpr, "weather")
+	decoder := nnlp.NewDecoder(fst, 8)
+	assertDecode(t, decoder, "weather in seattle", "weather in <city>seattle</city>")
+}
