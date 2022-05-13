@@ -1,12 +1,10 @@
 package nmutfst
 
-// #cgo LDFLAGS: -L ../../../openfst/lib -lfst
-// #cgo CXXFLAGS: -std=c++17 -I ../../../openfst/include
-/*
-#include "openfst_cwrapper.h"
-*/
-import "C"
-import "unsafe"
+import (
+	"unsafe"
+
+	"github.com/ling0322/nnlp/src/go/openfst"
+)
 
 // ArcIterator is the interface for iteration of arcs in FST
 type ArcIterator interface {
@@ -31,19 +29,19 @@ type arcIteratorImpl struct {
 // NewArcIterator creates an arc iterator of specific state from FST
 func (a *arcIteratorImpl) dispose() {
 	if a.internalPtr != nil {
-		C._c_arc_iterator_delete(a.internalPtr)
+		openfst.ArcIterator_Destroy(a.internalPtr)
 		a.internalPtr = nil
 	}
 }
 
 // Done returns true if iteration is done
 func (a *arcIteratorImpl) Done() bool {
-	return C._c_arc_iterator_done(a.internalPtr) != 0
+	return openfst.ArcIterator_Done(a.internalPtr)
 }
 
 // Next moves to next arc
 func (a *arcIteratorImpl) Next() {
-	C._c_arc_iterator_next(a.internalPtr)
+	openfst.ArcIterator_Next(a.internalPtr)
 }
 
 // Value returns current arc, panic on failed
@@ -58,23 +56,22 @@ func (a *arcIteratorImpl) MustValue() (arc Arc) {
 
 // Value returns current arc
 func (a *arcIteratorImpl) Value() (arc Arc, err error) {
-	carc := C.struct_NFSTARC{}
-	C._c_arc_iterator_value(a.internalPtr, &carc)
+	stdArc := openfst.ArcIterator_Value(a.internalPtr)
 
-	iSym, err := a.fst.iSymbolTable.Symbol(int(carc.ilabel))
+	iSym, err := a.fst.iSymbolTable.Symbol(stdArc.InputLabel)
 	if err != nil {
 		return
 	}
-	oSym, err := a.fst.oSymbolTable.Symbol(int(carc.olabel))
+	oSym, err := a.fst.oSymbolTable.Symbol(stdArc.OutputLabel)
 	if err != nil {
 		return
 	}
 
 	arc = Arc{
-		NextState:    int(carc.tgt_state),
+		NextState:    stdArc.TargetState,
 		InputSymbol:  iSym,
 		OutputSymbol: oSym,
-		Weight:       float32(carc.weight),
+		Weight:       stdArc.Weight,
 	}
 
 	return

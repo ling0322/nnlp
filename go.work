@@ -6,4 +6,5 @@ use ./src/go/errors
 use ./src/go/nnlp
 use ./src/go/nregex
 use ./src/go/nfst
+use ./src/go/openfst
 
